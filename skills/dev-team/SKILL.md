@@ -44,6 +44,7 @@ Small, purely mechanical fixes an engineer can resolve within their own step (a 
    Present the full plan to the user (summary, scope, acceptance criteria, disciplines required) and ask them to accept it, request changes, or reject it. Do not proceed past this point without explicit approval.
    - If they request changes, send that feedback to `project-manager` as a revision (see Core rule above) and re-present the revised plan. Repeat until approved.
    - Only once approved does the plan's `design` flag get acted on and implementation begin.
+   - The moment it's approved and work begins, if a viz URL is configured (see below), give the user that URL so they can watch the run live — one line, e.g. "Watch live: <url>". Don't wait until the pipeline finishes to mention it.
 
 3. **Design — `designer`** *(only if the approved plan requires `design`)*
    Pass the approved plan to `designer`. It uses the `design` skill to produce the design artifact and reports back key screens/states/components and implementation notes for the frontend engineer.
@@ -66,4 +67,21 @@ Small, purely mechanical fixes an engineer can resolve within their own step (a 
 
 ## Reporting back
 
-After each stage, give the user a short (1-3 sentence) status update — not the full agent transcript. At the end, summarize: what was built, test results, and the reviewer's findings (or that it was clean). If the pipeline stopped early (pending approval, repeated failures), say why and what's needed to continue.
+Concise throughout — this pipeline runs several agents per feature, so verbosity compounds fast.
+
+- Per stage: one line, past tense, no preamble. "Tests written, 4 cases, confirmed red." not "Great, now let's move on to the testing phase, where the test-engineer will...". Skip stages the user doesn't need narrated (e.g. don't announce "invoking test-engineer now" — just report its result).
+- Never paste an agent's full report verbatim. Extract the one or two facts that change what happens next (status, what changed, the number that matters) and drop the rest — the ledger/viz artifact (if configured) already carries the detail.
+- The plan (step 2) is the one exception — present it in full since the user is approving it.
+- At the end: 2-4 lines total — what was built, test result, reviewer verdict (or "clean"). If it stopped early, say why and what's needed, in one line.
+
+## Reducing token usage
+
+This pipeline's cost is dominated by (a) how much context each agent is handed and (b) how much it reads before acting. Keep both tight:
+
+- **Hand agents only what they need.** Don't forward an entire prior agent's report to the next one — extract the relevant fields (e.g. pass `test-engineer`'s failing-test list to the right engineer, not its full reasoning). Never forward your own conversation history; agents don't need it and can't use it.
+- **Prefer `researcher` over ad-hoc exploration.** Any agent facing "does X exist / where does Y live" should delegate to `researcher` (haiku, cheap) rather than Grep/Read-ing around itself. This is already in `project-manager`'s instructions — apply the same instinct yourself as orchestrator.
+- **Don't re-plan on every loop.** When `project-manager` revises a plan after an issue, it should patch the existing plan, not regenerate it from scratch — pass it the prior plan, not the original request again.
+- **Don't redo unaffected stages.** A loop-back only reruns the stages the revision actually touches (Core rule already says this — it's also the token-cheap choice).
+- **Keep agent reports short by design.** Each agent's own instructions ask for a report, not a transcript — don't ask an agent to "explain your reasoning" or "walk through what you did" unless actually debugging a failure.
+- **Cap retry loops.** The two-loop cap on `tester` failures (step 6) exists partly for cost: an unbounded fix-verify loop burns tokens without new information after a couple of tries — surface it to the user instead.
+- **Skip the viz write on failure, don't retry it.** A failed visualization update is not worth spending a retry's tokens on — catch and drop it (already stated above).

@@ -1,0 +1,737 @@
+<title>Pipeline Control Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ink: #12131c;
+    --ink-2: #191b28;
+    --hairline: #2b2e42;
+    --text: #e9e6dd;
+    --text-dim: #8d90a8;
+    --text-faint: #565973;
+    --accent: #d98a3d;
+    --accent-soft: rgba(217, 138, 61, 0.16);
+    --done: #6fcf97;
+    --done-soft: rgba(111, 207, 151, 0.14);
+    --blocked: #eb5757;
+    --blocked-soft: rgba(235, 87, 87, 0.14);
+    --pending: #454863;
+    --pending-soft: rgba(69, 72, 99, 0.2);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--text);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    padding: 20px 16px 48px;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px 24px;
+    border-bottom: 1px solid var(--hairline);
+    padding-bottom: 14px;
+  }
+
+  .title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    margin: 0;
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 600;
+    font-size: clamp(20px, 3vw, 27px);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  .run-meta {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .run-meta b { color: var(--text); font-weight: 500; }
+
+  .project-rail {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .project-chip {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    border: 1px solid var(--hairline);
+    border-radius: 5px;
+    background: var(--ink-2);
+    cursor: pointer;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .project-chip:hover { border-color: var(--text-faint); }
+
+  .project-chip.active {
+    border-color: var(--accent);
+    color: var(--text);
+    background: var(--accent-soft);
+  }
+
+  .project-chip .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+  }
+
+  .dot-pending { background: var(--pending); }
+  .dot-running { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .dot-done { background: var(--done); }
+  .dot-blocked { background: var(--blocked); box-shadow: 0 0 0 3px var(--blocked-soft); }
+  .dot-skipped { background: var(--text-faint); }
+
+  .project-chip .updated {
+    color: var(--text-faint);
+    font-size: 10.5px;
+  }
+
+  .board {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(280px, 1fr);
+    gap: 18px;
+  }
+
+  @media (max-width: 760px) {
+    .board { grid-template-columns: 1fr; }
+    .run-meta { text-align: left; }
+    header { flex-direction: column; }
+  }
+
+  .stage-viz {
+    position: relative;
+    background: var(--ink-2);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    overflow: hidden;
+    aspect-ratio: 16 / 11;
+  }
+
+  .stage-viz canvas { display: block; width: 100%; height: 100%; }
+
+  .viz-caption {
+    position: absolute;
+    left: 14px;
+    bottom: 12px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 0.04em;
+    pointer-events: none;
+  }
+
+  .viz-current {
+    position: absolute;
+    right: 14px;
+    top: 12px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    text-align: right;
+  }
+
+  .viz-current b {
+    display: block;
+    font-size: 14px;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+    margin-top: 2px;
+  }
+
+  .ledger {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    background: var(--ink-2);
+    overflow: hidden;
+  }
+
+  .ledger-head {
+    padding: 10px 14px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .stage-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 4px 12px;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--hairline);
+    align-items: start;
+  }
+
+  .stage-row:last-child { border-bottom: none; }
+
+  .stage-code {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    white-space: nowrap;
+    padding-top: 1px;
+  }
+
+  .stage-body { min-width: 0; }
+
+  .stage-name {
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .model-badge {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    color: var(--text-faint);
+    border: 1px solid var(--hairline);
+    border-radius: 3px;
+    padding: 1px 5px;
+    letter-spacing: 0.03em;
+  }
+
+  .stage-summary {
+    margin: 3px 0 0;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--text-dim);
+  }
+
+  .pill {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 3px;
+    white-space: nowrap;
+    justify-self: end;
+    margin-top: 1px;
+  }
+
+  .pill-pending { color: var(--text-dim); background: var(--pending-soft); }
+  .pill-running { color: var(--accent); background: var(--accent-soft); }
+  .pill-done { color: var(--done); background: var(--done-soft); }
+  .pill-blocked { color: var(--blocked); background: var(--blocked-soft); }
+  .pill-skipped { color: var(--text-faint); background: transparent; }
+
+  .ledger-foot {
+    padding: 11px 14px;
+    background: rgba(217, 138, 61, 0.05);
+  }
+
+  .ledger-foot .stage-code { color: var(--accent); }
+
+  footer {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    color: var(--text-faint);
+    text-align: center;
+    letter-spacing: 0.03em;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stage-viz { --motion: 0; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="title-block">
+      <span class="eyebrow" id="project-eyebrow">dev-team plugin · live tracker</span>
+      <h1 id="feature-title">Pipeline Control Room</h1>
+    </div>
+    <div class="run-meta" id="run-meta">
+      <span>RUN <b id="run-id">—</b></span>
+      <span>STARTED <b id="run-started">—</b></span>
+      <span>UPDATED <b id="run-updated">—</b></span>
+    </div>
+  </header>
+
+  <div class="project-rail" id="project-rail"></div>
+
+  <div class="board">
+    <div class="stage-viz">
+      <canvas id="scene"></canvas>
+      <div class="viz-caption">solder-trace view · main pipeline, research spur off PLAN</div>
+      <div class="viz-current">active stage<b id="viz-current-label">—</b></div>
+    </div>
+
+    <div class="ledger" id="ledger">
+      <div class="ledger-head">stage ledger</div>
+      <!-- rows injected by JS -->
+    </div>
+  </div>
+
+  <footer id="status-line">connecting to live run data…</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // ---------- pipeline definition ----------
+  // Fixed main-line order (matches skills/dev-team/SKILL.md). "research"
+  // is a spur, not numbered, because it's called on demand, not a fixed step.
+  var MAIN_LINE = [
+    { key: "plan",     code: "01", name: "Plan",             agent: "project-manager",  model: "opus" },
+    { key: "approval", code: "02", name: "Approval",         agent: "you",              model: null },
+    { key: "design",   code: "03", name: "Design",           agent: "designer",         model: "sonnet" },
+    { key: "tests",    code: "04", name: "Tests · RED",      agent: "test-engineer",    model: "sonnet" },
+    { key: "frontend", code: "05a", name: "Build · FE",      agent: "frontend-engineer",model: "sonnet" },
+    { key: "backend",  code: "05b", name: "Build · BE",      agent: "backend-engineer", model: "sonnet" },
+    { key: "verify",   code: "06", name: "Verify · GREEN",   agent: "tester",           model: "sonnet" },
+    { key: "review",   code: "07", name: "Review",           agent: "reviewer",         model: "sonnet" }
+  ];
+  var SPUR = { key: "researcher", name: "Research", agent: "researcher", model: "haiku" };
+
+  var STATUS_COLOR = { pending: 0x454863, running: 0xd98a3d, done: 0x6fcf97, blocked: 0xeb5757, skipped: 0x2b2e42 };
+  var STATUS_LABEL = { pending: "pending", running: "running", done: "done", blocked: "blocked", skipped: "skipped" };
+
+  // ---------- example seed (a real completed run from this plugin's own testing) ----------
+  // Keyed by project doc id, same as the live "runs" collection — this is what
+  // multiple concurrent /dev-team runs across projects look like in the rail.
+  var EXAMPLE_PROJECTS = {
+    "dev-team-test": {
+      projectName: "dev-team-test",
+      feature: "slugify(str) helper — lowercase, hyphenate, strip invalid chars",
+      runId: "demo-slugify",
+      startedAt: "2026-09-12T09:14:00Z",
+      updatedAt: "2026-09-12T09:21:40Z",
+      current: "done",
+      stages: {
+        plan:     { status: "done", summary: "Scoped to a pure function in slugify.js. No frontend touch; backend-only." },
+        approval: { status: "done", summary: "Plan accepted by user without changes." },
+        design:   { status: "skipped", summary: "Not required — no UI surface in this feature." },
+        tests:    { status: "done", summary: "4 jest cases written against acceptance criteria; confirmed red before implementation." },
+        frontend: { status: "skipped", summary: "Not required for this feature." },
+        backend:  { status: "done", summary: "slugify.js implemented; all 4 new tests pass locally." },
+        verify:   { status: "done", summary: "Full suite green, no regressions, all acceptance criteria covered." },
+        review:   { status: "done", summary: "Clean — no findings. Matches existing module conventions." },
+        researcher: { status: "done", summary: "Checked for an existing slug helper before planning — none found.", calls: 1 }
+      }
+    }
+  };
+
+  var STATUS_RANK = { blocked: 0, running: 1, pending: 2, done: 3, skipped: 3 };
+
+  function projectDotStatus(run) {
+    // worst-status-wins summary for the rail dot: a blocked or running stage
+    // anywhere in the run outranks a project that's merely pending/done.
+    var stages = (run && run.stages) || {};
+    var best = "done";
+    Object.keys(stages).forEach(function (k) {
+      var s = stages[k].status || "pending";
+      if (STATUS_RANK[s] < STATUS_RANK[best]) best = s;
+    });
+    return best;
+  }
+
+  // ---------- DOM: ledger ----------
+  var ledgerEl = document.getElementById("ledger");
+  var vizCurrentLabel = document.getElementById("viz-current-label");
+
+  function fmtTime(iso) {
+    if (!iso) return "—";
+    try {
+      var d = new Date(iso);
+      return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    } catch (e) { return "—"; }
+  }
+
+  function renderLedger(run) {
+    document.getElementById("feature-title").textContent = run.feature || "Pipeline Control Room";
+    document.getElementById("run-id").textContent = run.runId || "—";
+    document.getElementById("run-started").textContent = fmtTime(run.startedAt);
+    document.getElementById("run-updated").textContent = fmtTime(run.updatedAt);
+
+    var currentDef = MAIN_LINE.filter(function (s) { return s.key === run.current; })[0];
+    vizCurrentLabel.textContent = currentDef ? currentDef.name : (run.current === "researcher" ? "Research" : "Idle");
+
+    var html = "";
+    MAIN_LINE.forEach(function (def) {
+      var s = (run.stages && run.stages[def.key]) || { status: "pending", summary: "" };
+      html += stageRow(def.code, def.name, def.agent, def.model, s);
+    });
+    var r = (run.stages && run.stages.researcher) || { status: "pending", summary: "" };
+    html += '<div class="ledger-foot">' + stageRow("↳", SPUR.name + " (on demand)", SPUR.agent, SPUR.model, r) + '</div>';
+
+    ledgerEl.innerHTML = '<div class="ledger-head">stage ledger</div>' + html;
+  }
+
+  function stageRow(code, name, agent, model, s) {
+    var status = s.status || "pending";
+    var pillClass = "pill-" + (STATUS_LABEL[status] ? status : "pending");
+    return (
+      '<div class="stage-row">' +
+        '<div class="stage-code">' + code + '</div>' +
+        '<div class="stage-body">' +
+          '<div class="stage-name">' + name +
+            (model ? '<span class="model-badge">' + model + '</span>' : '') +
+            '<span class="model-badge">' + agent + '</span>' +
+          '</div>' +
+          (s.summary ? '<p class="stage-summary">' + escapeHtml(s.summary) + '</p>' : '') +
+        '</div>' +
+        '<div class="pill ' + pillClass + '">' + (STATUS_LABEL[status] || status) + '</div>' +
+      '</div>'
+    );
+  }
+
+  function escapeHtml(str) {
+    var d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  // ---------- three.js scene ----------
+  var canvas = document.getElementById("scene");
+  var container = canvas.parentElement;
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x12131c);
+  scene.fog = new THREE.FogExp2(0x12131c, 0.05);
+
+  var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  scene.add(new THREE.AmbientLight(0x30334a, 1.4));
+  var key = new THREE.PointLight(0xffe1bd, 1.1, 30);
+  key.position.set(2, 5, 6);
+  scene.add(key);
+
+  // floor grid — "circuit board"
+  var grid = new THREE.GridHelper(18, 24, 0x2b2e42, 0x1c1e2c);
+  grid.position.y = -1.4;
+  scene.add(grid);
+
+  // lay out main-line nodes along a gentle arc
+  var nodePositions = {};
+  var n = MAIN_LINE.length;
+  MAIN_LINE.forEach(function (def, i) {
+    var t = i / (n - 1);
+    var x = (t - 0.5) * 11;
+    var z = Math.sin(t * Math.PI) * -1.6;
+    var y = Math.sin(t * Math.PI * 2) * 0.15;
+    nodePositions[def.key] = new THREE.Vector3(x, y, z);
+  });
+  // spur position off the plan node
+  nodePositions.researcher = nodePositions.plan.clone().add(new THREE.Vector3(-0.9, 1.5, 1.6));
+
+  var nodeMeshes = {};
+  var nodeGlows = {};
+  var geo = new THREE.IcosahedronGeometry(0.42, 0);
+  var spurGeo = new THREE.OctahedronGeometry(0.3, 0);
+
+  function makeNode(key, geometry, pos) {
+    var mat = new THREE.MeshStandardMaterial({
+      color: STATUS_COLOR.pending,
+      emissive: 0x000000,
+      metalness: 0.25,
+      roughness: 0.45,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.55
+    });
+    var mesh = new THREE.Mesh(geometry, mat);
+    mesh.position.copy(pos);
+    scene.add(mesh);
+    nodeMeshes[key] = mesh;
+
+    var glowMat = new THREE.SpriteMaterial({ color: STATUS_COLOR.pending, transparent: true, opacity: 0 });
+    var glow = new THREE.Sprite(glowMat);
+    glow.scale.set(1.6, 1.6, 1.6);
+    glow.position.copy(pos);
+    scene.add(glow);
+    nodeGlows[key] = glow;
+  }
+
+  MAIN_LINE.forEach(function (def) { makeNode(def.key, geo, nodePositions[def.key]); });
+  makeNode("researcher", spurGeo, nodePositions.researcher);
+
+  // connecting trace: line through main-line nodes
+  var mainPts = MAIN_LINE.map(function (def) { return nodePositions[def.key]; });
+  var traceGeo = new THREE.BufferGeometry().setFromPoints(mainPts);
+  var traceMat = new THREE.LineBasicMaterial({ color: 0x2b2e42, transparent: true, opacity: 0.9 });
+  scene.add(new THREE.Line(traceGeo, traceMat));
+
+  // spur trace: plan -> researcher
+  var spurGeoLine = new THREE.BufferGeometry().setFromPoints([nodePositions.plan, nodePositions.researcher]);
+  var spurLine = new THREE.Line(spurGeoLine, new THREE.LineDashedMaterial({ color: 0x454863, dashSize: 0.12, gapSize: 0.08, transparent: true, opacity: 0.8 }));
+  spurLine.computeLineDistances();
+  scene.add(spurLine);
+
+  // traveling pulse marker for the active edge
+  var pulseGeo = new THREE.SphereGeometry(0.09, 12, 12);
+  var pulseMat = new THREE.MeshBasicMaterial({ color: 0xd98a3d, transparent: true, opacity: 0 });
+  var pulse = new THREE.Mesh(pulseGeo, pulseMat);
+  scene.add(pulse);
+
+  function applyStatus(key, status) {
+    var mesh = nodeMeshes[key];
+    var glow = nodeGlows[key];
+    if (!mesh) return;
+    var color = STATUS_COLOR[status] || STATUS_COLOR.pending;
+    mesh.material.color.setHex(color);
+    mesh.userData.status = status;
+    if (status === "pending") {
+      mesh.material.wireframe = true;
+      mesh.material.opacity = 0.5;
+      mesh.material.emissive.setHex(0x000000);
+      glow.material.opacity = 0;
+    } else if (status === "skipped") {
+      mesh.material.wireframe = true;
+      mesh.material.opacity = 0.18;
+      mesh.material.emissive.setHex(0x000000);
+      glow.material.opacity = 0;
+    } else if (status === "running") {
+      mesh.material.wireframe = false;
+      mesh.material.opacity = 0.95;
+      mesh.material.emissive.setHex(color);
+      mesh.material.emissiveIntensity = 0.6;
+      glow.material.color.setHex(color);
+      glow.material.opacity = 0.35;
+    } else if (status === "done") {
+      mesh.material.wireframe = false;
+      mesh.material.opacity = 0.95;
+      mesh.material.emissive.setHex(color);
+      mesh.material.emissiveIntensity = 0.18;
+      glow.material.color.setHex(color);
+      glow.material.opacity = 0.18;
+    } else if (status === "blocked") {
+      mesh.material.wireframe = false;
+      mesh.material.opacity = 0.95;
+      mesh.material.emissive.setHex(color);
+      mesh.material.emissiveIntensity = 0.5;
+      glow.material.color.setHex(color);
+      glow.material.opacity = 0.3;
+    }
+  }
+
+  function applyRun(run) {
+    var stages = run.stages || {};
+    MAIN_LINE.forEach(function (def) { applyStatus(def.key, (stages[def.key] || {}).status || "pending"); });
+    applyStatus("researcher", (stages.researcher || {}).status === "pending" ? "pending" : (stages.researcher || {}).status || "pending");
+
+    // pulse travels toward whichever main-line stage is currently "running"
+    var runningIdx = -1;
+    MAIN_LINE.forEach(function (def, i) { if ((stages[def.key] || {}).status === "running") runningIdx = i; });
+    pulse.userData.active = runningIdx > 0;
+    if (runningIdx > 0) {
+      pulse.userData.from = nodePositions[MAIN_LINE[runningIdx - 1].key];
+      pulse.userData.to = nodePositions[MAIN_LINE[runningIdx].key];
+      pulseMat.opacity = 0.9;
+    } else if ((stages.researcher || {}).status === "running") {
+      pulse.userData.from = nodePositions.plan;
+      pulse.userData.to = nodePositions.researcher;
+      pulseMat.opacity = 0.9;
+    } else {
+      pulseMat.opacity = 0;
+    }
+  }
+
+  function resize() {
+    var w = container.clientWidth, h = container.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+  new ResizeObserver(resize).observe(container);
+  resize();
+
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var clock = new THREE.Clock();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    var t = clock.getElapsedTime();
+
+    if (!reduceMotion) {
+      var angle = t * 0.12;
+      camera.position.set(Math.sin(angle) * 8.5, 2.6 + Math.sin(t * 0.2) * 0.4, Math.cos(angle) * 8.5);
+    } else {
+      camera.position.set(8.5, 2.6, 0);
+    }
+    camera.lookAt(0, -0.2, 0);
+
+    Object.keys(nodeMeshes).forEach(function (key) {
+      var mesh = nodeMeshes[key];
+      var pulseAmt = mesh.userData.status === "running" && !reduceMotion ? 1 + Math.sin(t * 4) * 0.12 : 1;
+      mesh.scale.setScalar(pulseAmt);
+      mesh.rotation.y += reduceMotion ? 0 : 0.006;
+      mesh.rotation.x += reduceMotion ? 0 : 0.003;
+    });
+
+    if (pulse.userData.active && !reduceMotion) {
+      var p = (Math.sin(t * 2.2) + 1) / 2;
+      pulse.position.lerpVectors(pulse.userData.from, pulse.userData.to, p);
+    }
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // ---------- multi-project dashboard ----------
+  var statusLine = document.getElementById("status-line");
+  var railEl = document.getElementById("project-rail");
+  var eyebrowEl = document.getElementById("project-eyebrow");
+
+  var projects = {};       // docId -> run data, live across every project running /dev-team
+  var selectedId = null;   // which project's pipeline the viz + ledger currently show
+  var userSelected = false; // once a person clicks a chip, stop auto-following the busiest project
+
+  function relTime(iso) {
+    if (!iso) return "";
+    var ms = Date.now() - new Date(iso).getTime();
+    var min = Math.round(ms / 60000);
+    if (min < 1) return "now";
+    if (min < 60) return min + "m ago";
+    var hr = Math.round(min / 60);
+    if (hr < 24) return hr + "h ago";
+    return Math.round(hr / 24) + "d ago";
+  }
+
+  function pickDefaultSelection() {
+    // prefer whichever project has a stage actively running, else most recently updated
+    var ids = Object.keys(projects);
+    if (!ids.length) return null;
+    var running = ids.filter(function (id) { return projectDotStatus(projects[id]) === "running"; });
+    var pool = running.length ? running : ids;
+    pool.sort(function (a, b) {
+      return new Date(projects[b].updatedAt || 0) - new Date(projects[a].updatedAt || 0);
+    });
+    return pool[0];
+  }
+
+  function renderRail() {
+    var ids = Object.keys(projects).sort(function (a, b) {
+      return new Date(projects[b].updatedAt || 0) - new Date(projects[a].updatedAt || 0);
+    });
+
+    if (!userSelected || !projects[selectedId]) {
+      selectedId = pickDefaultSelection();
+    }
+
+    railEl.innerHTML = ids.map(function (id) {
+      var run = projects[id];
+      var dot = projectDotStatus(run);
+      var active = id === selectedId ? " active" : "";
+      return (
+        '<div class="project-chip' + active + '" data-id="' + escapeHtml(id) + '">' +
+          '<span class="dot dot-' + dot + '"></span>' +
+          '<span>' + escapeHtml(run.projectName || id) + '</span>' +
+          '<span class="updated">' + relTime(run.updatedAt) + '</span>' +
+        '</div>'
+      );
+    }).join("");
+
+    Array.prototype.forEach.call(railEl.querySelectorAll(".project-chip"), function (chip) {
+      chip.addEventListener("click", function () {
+        userSelected = true;
+        selectedId = chip.getAttribute("data-id");
+        renderRail();
+        showSelected();
+      });
+    });
+  }
+
+  function showSelected() {
+    if (!selectedId || !projects[selectedId]) return;
+    var run = projects[selectedId];
+    eyebrowEl.textContent = Object.keys(projects).length > 1
+      ? Object.keys(projects).length + " projects live · showing " + (run.projectName || selectedId)
+      : "dev-team plugin · live tracker";
+    renderLedger(run);
+    applyRun(run);
+  }
+
+  // resting-state content: a real completed run from this plugin's own test pass
+  projects = EXAMPLE_PROJECTS;
+  renderRail();
+  showSelected();
+
+  (async function () {
+    try {
+      var db = window.claude && (await window.claude.use("db"));
+      if (!db) {
+        statusLine.textContent = "showing last known runs · example data (live db unavailable in this view)";
+        return;
+      }
+      db.collection("runs").onSnapshot(
+        function (snap) {
+          var live = {};
+          snap.docs.forEach(function (doc) { live[doc.id] = doc.data(); });
+          if (snap.size > 0) projects = live; // once live data exists, it fully replaces the example seed
+          statusLine.textContent = "live · tracking " + snap.size + " project" + (snap.size === 1 ? "" : "s");
+          renderRail();
+          showSelected();
+        },
+        function (err) {
+          statusLine.textContent = "live updates unavailable (" + err.code + ") · showing last known runs";
+        }
+      );
+    } catch (e) {
+      statusLine.textContent = "showing last known runs · example data (live db unavailable in this view)";
+    }
+  })();
+})();
+</script>

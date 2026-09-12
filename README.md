@@ -14,10 +14,10 @@ Any specialist that hits an issue implying the plan itself was wrong (not just a
 
 ## Live visualization (optional)
 
-A published Artifact — **Pipeline Control Room** — renders the pipeline as a live 3D tracker: each stage lights up as it starts/finishes, with a status ledger alongside.
+A published Artifact — **Pipeline Control Room** — renders the pipeline as a live 3D tracker: each stage lights up as it starts/finishes, with a status ledger alongside. It's a dashboard, not a single-run view — every project currently running `/dev-team` shows up as its own chip in a rail at the top, so you can see multiple teams/projects at a glance and click into whichever one you want.
 
 To enable it:
-1. Publish your own copy of the Pipeline Control Room artifact (ask Claude to do this, or open an existing one via `/artifacts`) with the `db` capability.
+1. Publish your own copy of the Pipeline Control Room artifact — the source lives at [`viz/pipeline-control-room.html`](viz/pipeline-control-room.html) in this repo — with the `db` capability (ask Claude to publish it for you).
 2. Save its URL to `~/.claude/dev-team-viz.json`:
    ```json
    { "url": "https://claude.ai/code/artifact/<your-artifact-id>" }

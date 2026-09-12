@@ -11,14 +11,15 @@ Orchestrate a fixed pipeline of specialist subagents (defined in this plugin's `
 
 ## Live visualization (optional)
 
-If `~/.claude/dev-team-viz.json` exists and has a `url` field, it points to a published "Pipeline Control Room" Artifact (a live 3D tracker) that this run should update. If the file is missing, skip this entirely — visualization is optional and never blocks the pipeline.
+If `~/.claude/dev-team-viz.json` exists and has a `url` field, it points to a published "Pipeline Control Room" Artifact — a live 3D dashboard that tracks every project currently running `/dev-team` at once, each in its own lane. If the file is missing, skip this entirely — visualization is optional and never blocks the pipeline.
 
 When a viz URL is configured:
-1. At the start of a run, use the Artifact tool (`action: "write_db"`, `db_op: "set"`, that `url`, `collection: "runs"`, `doc_id: "current"`) to write the initial document: `feature`, a generated `runId`, `startedAt` (ISO), `updatedAt`, `current: "plan"`, and a `stages` object with every stage key (`plan`, `approval`, `design`, `tests`, `frontend`, `backend`, `verify`, `review`, `researcher`) set to `{status: "pending"}`.
-2. Immediately before invoking each specialist, `update` that document: set that stage's status to `"running"` and `current` to its key, `updatedAt` to now.
-3. Immediately after a specialist reports back, `update` again: status to `"done"` (or `"blocked"` if it raised an issue per the Core rule, or `"skipped"` for `design`/`frontend`/`backend` when the plan doesn't require that discipline), plus a one-sentence `summary` of what it reported, and `updatedAt`.
-4. On a loop back to `project-manager`, reset the stages being redone to `"pending"` before re-running them.
-5. Use `if_version` (from the last read/write of that document) on every update to avoid clobbering a concurrent write.
+1. Compute a project doc id from the current working directory: take its basename, lowercase it, replace any character outside `a-z0-9-` with `-`, and collapse repeats (e.g. `/Users/sam/Dev/checkout-flow` → `checkout-flow`). This keeps concurrent runs in different projects from colliding — each writes to `runs/<that id>`, never `runs/current`.
+2. At the start of a run, use the Artifact tool (`action: "write_db"`, `db_op: "set"`, that `url`, `collection: "runs"`, `doc_id: "<project id>"`) to write the initial document: `projectName` (the same basename, unslugified), `feature`, a generated `runId`, `startedAt` (ISO), `updatedAt`, `current: "plan"`, and a `stages` object with every stage key (`plan`, `approval`, `design`, `tests`, `frontend`, `backend`, `verify`, `review`, `researcher`) set to `{status: "pending"}`.
+3. Immediately before invoking each specialist, `update` that document: set that stage's status to `"running"` and `current` to its key, `updatedAt` to now.
+4. Immediately after a specialist reports back, `update` again: status to `"done"` (or `"blocked"` if it raised an issue per the Core rule, or `"skipped"` for `design`/`frontend`/`backend` when the plan doesn't require that discipline), plus a one-sentence `summary` of what it reported, and `updatedAt`.
+5. On a loop back to `project-manager`, reset the stages being redone to `"pending"` before re-running them.
+6. Use `if_version` (from the last read/write of that document) on every update to avoid clobbering a concurrent write — this matters more now that multiple runs may write to the same artifact's database (different docs, but still worth pinning).
 
 Keep this lightweight: one or two short tool calls per stage transition, never more, and never let a failed viz write interrupt or slow down the actual pipeline — catch and ignore errors from it.
 

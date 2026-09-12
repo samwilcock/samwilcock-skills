@@ -16,7 +16,7 @@ Any specialist that hits an issue implying the plan itself was wrong (not just a
 
 ```
 /plugin marketplace add samwilcock/samwilcock-skills
-/plugin install dev-team
+/plugin install dev-team@dev-team
 ```
 
 ## Use
@@ -32,6 +32,6 @@ The skill will call each specialist agent in turn, asking you only when it hits 
 ## Updating
 
 ```
-/plugin marketplace update dev-team-marketplace
+/plugin marketplace update dev-team
 /plugin update dev-team
 ```

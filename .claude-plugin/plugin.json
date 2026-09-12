@@ -1,0 +1,8 @@
+{
+  "name": "dev-team",
+  "version": "0.1.0",
+  "description": "A specialist dev team (PM, test engineer, frontend/backend engineers, tester, reviewer) orchestrated through a TDD workflow via the /dev-team skill.",
+  "author": {
+    "name": "Sam Wilcock"
+  }
+}

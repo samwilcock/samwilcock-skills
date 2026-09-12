@@ -1,0 +1,13 @@
+{
+  "name": "dev-team-marketplace",
+  "owner": {
+    "name": "Sam Wilcock"
+  },
+  "plugins": [
+    {
+      "name": "dev-team",
+      "source": "./",
+      "description": "A specialist dev team (PM, test engineer, frontend/backend engineers, tester, reviewer) orchestrated through a TDD workflow via the /dev-team skill."
+    }
+  ]
+}

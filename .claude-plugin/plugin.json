@@ -1,6 +1,6 @@
 {
   "name": "dev-team",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "A specialist dev team (PM on opus, researcher on haiku, designer, database engineer, frontend/backend/devops engineers, test engineer, tester, reviewer) orchestrated through a TDD workflow via the /dev-team skill, with a user approval gate on the plan, issue loopback to the PM, an optional live 3D pipeline visualization, and pause/resume support around context compaction.",
   "author": {
     "name": "Sam Wilcock"

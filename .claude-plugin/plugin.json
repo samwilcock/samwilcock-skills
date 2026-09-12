@@ -1,7 +1,7 @@
 {
   "name": "dev-team",
-  "version": "0.1.0",
-  "description": "A specialist dev team (PM, test engineer, frontend/backend engineers, tester, reviewer) orchestrated through a TDD workflow via the /dev-team skill.",
+  "version": "0.2.0",
+  "description": "A specialist dev team (PM, designer, test engineer, frontend/backend engineers, tester, reviewer) orchestrated through a TDD workflow via the /dev-team skill, with a user approval gate on the plan and issue loopback to the PM.",
   "author": {
     "name": "Sam Wilcock"
   }

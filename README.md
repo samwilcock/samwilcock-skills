@@ -2,11 +2,14 @@
 
 A Claude Code plugin that gives you a specialist dev team, orchestrated via TDD:
 
-1. **project-manager** — plans the feature from your request/chat
-2. **test-engineer** — writes failing tests against the plan's acceptance criteria
-3. **frontend-engineer** / **backend-engineer** — implement only the disciplines the tests require (run in parallel when both are needed)
-4. **tester** — independently verifies everything passes
-5. **reviewer** — final code review
+1. **project-manager** — plans the feature from your request/chat; **you approve the plan before anything is built**
+2. **designer** — (only if the plan calls for it) produces UI design via the `/design` skill
+3. **test-engineer** — writes failing tests against the plan's acceptance criteria
+4. **frontend-engineer** / **backend-engineer** — implement only the disciplines the tests require (run in parallel when both are needed)
+5. **tester** — independently verifies everything passes
+6. **reviewer** — final code review
+
+Any specialist that hits an issue implying the plan itself was wrong (not just a code bug) sends it back to the project manager, who revises the plan — you approve the revision before the pipeline continues.
 
 ## Install
 

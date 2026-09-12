@@ -53,6 +53,7 @@ Small, purely mechanical fixes an engineer can resolve within their own step (a 
 ## Pipeline
 
 0. **Check for a paused run** (see Run state above) before doing anything else. If one exists for this project, ask the user whether to resume or discard it. Resuming jumps straight to the saved `current` stage; discarding deletes the old state file and proceeds to step 1 as normal.
+   - On resume, if a viz URL is configured, give it to the user again in the same "Watch live: <url>" line as step 2 below — don't assume they still have the tab open from before the pause.
 
 1. **Plan — `project-manager`**
    Summarize the feature request and relevant conversation context (the agent has no memory of this chat) and pass it to the `project-manager` agent. It returns a plan: summary, scope, acceptance criteria, required disciplines (`design`/`frontend`/`backend`, any combination), and open questions.

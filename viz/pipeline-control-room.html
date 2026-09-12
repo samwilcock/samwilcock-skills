@@ -310,7 +310,7 @@
   <div class="board">
     <div class="stage-viz">
       <canvas id="scene"></canvas>
-      <div class="viz-caption">solder-trace view · main pipeline, research spur off PLAN · builders appear on running stages</div>
+      <div class="viz-caption">site plan view · rooms rise as each stage builds, roof means done · site office is the research spur</div>
       <div class="viz-current">active stage<b id="viz-current-label">—</b></div>
     </div>
 
@@ -441,209 +441,198 @@
     return d.innerHTML;
   }
 
-  // ---------- three.js scene ----------
+  // ---------- three.js scene: a house floorplan, built room by room ----------
+  // Each pipeline stage is a room in a row (a wing for frontend/backend side
+  // by side, since they build in parallel); researcher is a small site office
+  // off to the side, since it's an on-demand visit, not part of the house.
   var canvas = document.getElementById("scene");
   var container = canvas.parentElement;
   var scene = new THREE.Scene();
   scene.background = new THREE.Color(0x12131c);
-  scene.fog = new THREE.FogExp2(0x12131c, 0.05);
+  scene.fog = new THREE.FogExp2(0x12131c, 0.045);
 
-  var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  var camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
-  scene.add(new THREE.AmbientLight(0x30334a, 1.4));
-  var key = new THREE.PointLight(0xffe1bd, 1.1, 30);
-  key.position.set(2, 5, 6);
+  scene.add(new THREE.AmbientLight(0x30334a, 1.5));
+  var key = new THREE.PointLight(0xffe1bd, 1.15, 40);
+  key.position.set(3, 7, 5);
   scene.add(key);
 
-  // floor grid — "circuit board"
-  var grid = new THREE.GridHelper(18, 24, 0x2b2e42, 0x1c1e2c);
-  grid.position.y = -1.4;
-  scene.add(grid);
+  // site ground — a plot of land the house sits on
+  var ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(20, 10),
+    new THREE.MeshStandardMaterial({ color: 0x181a26, roughness: 0.95 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.03;
+  scene.add(ground);
+  var siteGrid = new THREE.GridHelper(20, 20, 0x262a3c, 0x1c1e2c);
+  siteGrid.position.y = -0.02;
+  scene.add(siteGrid);
 
-  // lay out main-line nodes along a gentle arc
-  var nodePositions = {};
-  var n = MAIN_LINE.length;
-  MAIN_LINE.forEach(function (def, i) {
-    var t = i / (n - 1);
-    var x = (t - 0.5) * 11;
-    var z = Math.sin(t * Math.PI) * -1.6;
-    var y = Math.sin(t * Math.PI * 2) * 0.15;
-    nodePositions[def.key] = new THREE.Vector3(x, y, z);
-  });
-  // spur position off the plan node
-  nodePositions.researcher = nodePositions.plan.clone().add(new THREE.Vector3(-0.9, 1.5, 1.6));
+  var ROOM_LAYOUT = {
+    plan:       { x: -5.25, z: 0,    w: 1.55, d: 1.35 },
+    approval:   { x: -3.5,  z: 0,    w: 1.55, d: 1.35 },
+    design:     { x: -1.75, z: 0,    w: 1.55, d: 1.35 },
+    tests:      { x: 0,     z: 0,    w: 1.55, d: 1.35 },
+    frontend:   { x: 1.75,  z: -0.42, w: 1.55, d: 0.58 },
+    backend:    { x: 1.75,  z: 0.42,  w: 1.55, d: 0.58 },
+    verify:     { x: 3.5,   z: 0,    w: 1.55, d: 1.35 },
+    review:     { x: 5.25,  z: 0,    w: 1.55, d: 1.35 },
+    researcher: { x: -5.25, z: -2.15, w: 1.05, d: 0.95 }
+  };
+  var WALL_HEIGHT = 0.85;
 
-  var nodeMeshes = {};
-  var nodeGlows = {};
-  var geo = new THREE.IcosahedronGeometry(0.42, 0);
-  var spurGeo = new THREE.OctahedronGeometry(0.3, 0);
+  var rooms = {}; // key -> { group, wall, wallMat, floor, roof, windows[], beacon, status }
 
-  function makeNode(key, geometry, pos) {
-    var mat = new THREE.MeshStandardMaterial({
-      color: STATUS_COLOR.pending,
-      emissive: 0x000000,
-      metalness: 0.25,
-      roughness: 0.45,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.55
+  function makeRoom(key, layout) {
+    var group = new THREE.Group();
+    group.position.set(layout.x, 0, layout.z);
+
+    // footprint outline — the plot marked out on the blueprint before anything is built
+    var hw = layout.w / 2, hd = layout.d / 2;
+    var pts = [
+      new THREE.Vector3(-hw, 0.01, -hd), new THREE.Vector3(hw, 0.01, -hd),
+      new THREE.Vector3(hw, 0.01, hd), new THREE.Vector3(-hw, 0.01, hd),
+      new THREE.Vector3(-hw, 0.01, -hd)
+    ];
+    var footprintGeo = new THREE.BufferGeometry().setFromPoints(pts);
+    var footprintMat = new THREE.LineDashedMaterial({ color: 0x454863, dashSize: 0.12, gapSize: 0.07, transparent: true, opacity: 0.7 });
+    var footprint = new THREE.Line(footprintGeo, footprintMat);
+    footprint.computeLineDistances();
+    group.add(footprint);
+
+    var floor = new THREE.Mesh(
+      new THREE.BoxGeometry(layout.w - 0.06, 0.05, layout.d - 0.06),
+      new THREE.MeshStandardMaterial({ color: 0x21232f, roughness: 0.8, transparent: true, opacity: 0 })
+    );
+    floor.position.y = 0.025;
+    group.add(floor);
+
+    var wallGeo = new THREE.BoxGeometry(layout.w - 0.14, 1, layout.d - 0.14);
+    wallGeo.translate(0, 0.5, 0); // pivot at the base so scale.y grows upward, not from center
+    var wallMat = new THREE.MeshStandardMaterial({ color: STATUS_COLOR.pending, metalness: 0.2, roughness: 0.55, emissive: 0x000000, transparent: true, opacity: 0.9 });
+    var wall = new THREE.Mesh(wallGeo, wallMat);
+    wall.scale.y = 0.0001;
+    group.add(wall);
+
+    var roof = new THREE.Mesh(
+      new THREE.BoxGeometry(layout.w - 0.02, 0.06, layout.d - 0.02),
+      new THREE.MeshStandardMaterial({ color: 0xd98a3d, metalness: 0.3, roughness: 0.4, emissive: 0xd98a3d, emissiveIntensity: 0.15 })
+    );
+    roof.position.y = WALL_HEIGHT + 0.03;
+    roof.visible = false;
+    group.add(roof);
+
+    var windows = [];
+    var winMat1 = new THREE.MeshBasicMaterial({ color: 0xffe1bd, transparent: true, opacity: 0 });
+    var winGeo = new THREE.PlaneGeometry(Math.min(0.22, layout.w * 0.14), 0.16);
+    [-1, 1].forEach(function (side) {
+      var w1 = new THREE.Mesh(winGeo, winMat1.clone());
+      w1.position.set(side * layout.w * 0.22, WALL_HEIGHT * 0.55, hd - 0.075);
+      group.add(w1);
+      windows.push(w1);
     });
-    var mesh = new THREE.Mesh(geometry, mat);
-    mesh.position.copy(pos);
-    scene.add(mesh);
-    nodeMeshes[key] = mesh;
 
-    var glowMat = new THREE.SpriteMaterial({ color: STATUS_COLOR.pending, transparent: true, opacity: 0 });
-    var glow = new THREE.Sprite(glowMat);
-    glow.scale.set(1.6, 1.6, 1.6);
-    glow.position.copy(pos);
-    scene.add(glow);
-    nodeGlows[key] = glow;
+    var beacon = new THREE.Mesh(
+      new THREE.SphereGeometry(0.05, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xeb5757, transparent: true, opacity: 0 })
+    );
+    beacon.position.y = WALL_HEIGHT + 0.14;
+    group.add(beacon);
+
+    scene.add(group);
+    rooms[key] = { group: group, wall: wall, wallMat: wallMat, floor: floor, roof: roof, windows: windows, beacon: beacon, status: "pending", phase: Math.random() * Math.PI * 2 };
   }
 
-  MAIN_LINE.forEach(function (def) { makeNode(def.key, geo, nodePositions[def.key]); });
-  makeNode("researcher", spurGeo, nodePositions.researcher);
+  Object.keys(ROOM_LAYOUT).forEach(function (key) { makeRoom(key, ROOM_LAYOUT[key]); });
 
-  // connecting trace: line through main-line nodes
-  var mainPts = MAIN_LINE.map(function (def) { return nodePositions[def.key]; });
-  var traceGeo = new THREE.BufferGeometry().setFromPoints(mainPts);
-  var traceMat = new THREE.LineBasicMaterial({ color: 0x2b2e42, transparent: true, opacity: 0.9 });
-  scene.add(new THREE.Line(traceGeo, traceMat));
+  // walkway connecting the main-line rooms, plus a spur path out to the site office
+  var walkPts = MAIN_LINE.filter(function (d) { return d.key !== "frontend" && d.key !== "backend"; })
+    .map(function (d) { return new THREE.Vector3(ROOM_LAYOUT[d.key].x, 0.015, 0); });
+  walkPts.splice(4, 0, new THREE.Vector3(ROOM_LAYOUT.frontend.x, 0.015, 0));
+  var walkGeo = new THREE.BufferGeometry().setFromPoints(walkPts);
+  scene.add(new THREE.Line(walkGeo, new THREE.LineBasicMaterial({ color: 0x2b2e42, transparent: true, opacity: 0.8 })));
 
-  // spur trace: plan -> researcher
-  var spurGeoLine = new THREE.BufferGeometry().setFromPoints([nodePositions.plan, nodePositions.researcher]);
-  var spurLine = new THREE.Line(spurGeoLine, new THREE.LineDashedMaterial({ color: 0x454863, dashSize: 0.12, gapSize: 0.08, transparent: true, opacity: 0.8 }));
+  var spurGeo = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(ROOM_LAYOUT.plan.x, 0.015, 0),
+    new THREE.Vector3(ROOM_LAYOUT.researcher.x, 0.015, ROOM_LAYOUT.researcher.z)
+  ]);
+  var spurMat = new THREE.LineDashedMaterial({ color: 0x454863, dashSize: 0.12, gapSize: 0.08, transparent: true, opacity: 0.7 });
+  var spurLine = new THREE.Line(spurGeo, spurMat);
   spurLine.computeLineDistances();
   scene.add(spurLine);
 
-  // traveling pulse marker for the active edge
-  var pulseGeo = new THREE.SphereGeometry(0.09, 12, 12);
-  var pulseMat = new THREE.MeshBasicMaterial({ color: 0xd98a3d, transparent: true, opacity: 0 });
-  var pulse = new THREE.Mesh(pulseGeo, pulseMat);
-  scene.add(pulse);
-
-  // ---------- builder rigs: a small low-poly worker appears at whichever
-  // node is currently "running", hammering away until it finishes ----------
-  var BUILDER_COLOR = 0xd98a3d;
-  var builders = {}; // key -> { group, armPivot, spark, phase }
-
-  function makeBuilder() {
-    var group = new THREE.Group();
-    var bodyMat = new THREE.MeshStandardMaterial({ color: 0x21232f, metalness: 0.3, roughness: 0.6, emissive: BUILDER_COLOR, emissiveIntensity: 0.08 });
-    var accentMat = new THREE.MeshStandardMaterial({ color: BUILDER_COLOR, metalness: 0.4, roughness: 0.35, emissive: BUILDER_COLOR, emissiveIntensity: 0.25 });
-
-    var body = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.24, 0.13), bodyMat);
-    body.position.y = 0.14;
-    group.add(body);
-
-    var head = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 10), accentMat);
-    head.position.y = 0.3;
-    group.add(head);
-
-    var legL = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 6), bodyMat);
-    legL.position.set(-0.045, 0, 0);
-    group.add(legL);
-    var legR = legL.clone();
-    legR.position.x = 0.045;
-    group.add(legR);
-
-    // hammer arm, pivoted at the shoulder so it can swing
-    var armPivot = new THREE.Group();
-    armPivot.position.set(0.11, 0.22, 0);
-    var arm = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.2, 6), bodyMat);
-    arm.position.y = -0.1;
-    armPivot.add(arm);
-    var hammerHead = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.045, 0.045), accentMat);
-    hammerHead.position.y = -0.2;
-    armPivot.add(hammerHead);
-    group.add(armPivot);
-
-    var sparkMat = new THREE.SpriteMaterial({ color: 0xffe1bd, transparent: true, opacity: 0 });
-    var spark = new THREE.Sprite(sparkMat);
-    spark.scale.set(0.22, 0.22, 0.22);
-    spark.position.set(0.11, 0.02, 0);
-    group.add(spark);
-
-    return { group: group, armPivot: armPivot, spark: spark };
-  }
-
-  function setBuilderActive(key, pos, active) {
-    if (active && !builders[key]) {
-      var b = makeBuilder();
-      b.group.position.copy(pos).add(new THREE.Vector3(0.55, -0.42, 0.15));
-      b.group.lookAt(pos.x, b.group.position.y, pos.z);
-      b.phase = Math.random() * Math.PI * 2;
-      scene.add(b.group);
-      builders[key] = b;
-    } else if (!active && builders[key]) {
-      scene.remove(builders[key].group);
-      delete builders[key];
-    }
-  }
+  // supervisor marker: hovers over whichever room is currently under construction
+  var supervisorGeo = new THREE.ConeGeometry(0.07, 0.16, 4);
+  var supervisorMat = new THREE.MeshBasicMaterial({ color: 0xd98a3d, transparent: true, opacity: 0 });
+  var supervisor = new THREE.Mesh(supervisorGeo, supervisorMat);
+  scene.add(supervisor);
 
   function applyStatus(key, status) {
-    var mesh = nodeMeshes[key];
-    var glow = nodeGlows[key];
-    if (!mesh) return;
+    var room = rooms[key];
+    if (!room) return;
+    room.status = status;
     var color = STATUS_COLOR[status] || STATUS_COLOR.pending;
-    mesh.material.color.setHex(color);
-    mesh.userData.status = status;
-    setBuilderActive(key, nodePositions[key], status === "running");
+
     if (status === "pending") {
-      mesh.material.wireframe = true;
-      mesh.material.opacity = 0.5;
-      mesh.material.emissive.setHex(0x000000);
-      glow.material.opacity = 0;
+      room.wallMat.color.setHex(STATUS_COLOR.pending);
+      room.wallMat.emissive.setHex(0x000000);
+      room.floor.material.opacity = 0;
+      room.roof.visible = false;
+      room.beacon.material.opacity = 0;
+      room.windows.forEach(function (w) { w.material.opacity = 0; });
     } else if (status === "skipped") {
-      mesh.material.wireframe = true;
-      mesh.material.opacity = 0.18;
-      mesh.material.emissive.setHex(0x000000);
-      glow.material.opacity = 0;
+      room.wallMat.color.setHex(STATUS_COLOR.skipped);
+      room.wallMat.emissive.setHex(0x000000);
+      room.floor.material.opacity = 0.12;
+      room.roof.visible = false;
+      room.beacon.material.opacity = 0;
+      room.windows.forEach(function (w) { w.material.opacity = 0; });
     } else if (status === "running") {
-      mesh.material.wireframe = false;
-      mesh.material.opacity = 0.95;
-      mesh.material.emissive.setHex(color);
-      mesh.material.emissiveIntensity = 0.6;
-      glow.material.color.setHex(color);
-      glow.material.opacity = 0.35;
+      room.wallMat.color.setHex(color);
+      room.wallMat.emissive.setHex(color);
+      room.wallMat.emissiveIntensity = 0.25;
+      room.floor.material.opacity = 0.95;
+      room.roof.visible = false;
+      room.beacon.material.opacity = 0;
     } else if (status === "done") {
-      mesh.material.wireframe = false;
-      mesh.material.opacity = 0.95;
-      mesh.material.emissive.setHex(color);
-      mesh.material.emissiveIntensity = 0.18;
-      glow.material.color.setHex(color);
-      glow.material.opacity = 0.18;
+      room.wallMat.color.setHex(0x2f3244);
+      room.wallMat.emissive.setHex(color);
+      room.wallMat.emissiveIntensity = 0.06;
+      room.floor.material.opacity = 0.95;
+      room.roof.visible = true;
+      room.beacon.material.opacity = 0;
+      room.windows.forEach(function (w) { w.material.opacity = 0.85; w.material.color.setHex(0xffe1bd); });
     } else if (status === "blocked") {
-      mesh.material.wireframe = false;
-      mesh.material.opacity = 0.95;
-      mesh.material.emissive.setHex(color);
-      mesh.material.emissiveIntensity = 0.5;
-      glow.material.color.setHex(color);
-      glow.material.opacity = 0.3;
+      room.wallMat.color.setHex(0x2f3244);
+      room.wallMat.emissive.setHex(color);
+      room.wallMat.emissiveIntensity = 0.35;
+      room.floor.material.opacity = 0.95;
+      room.roof.visible = true;
+      room.windows.forEach(function (w) { w.material.opacity = 0.8; w.material.color.setHex(color); });
     }
   }
 
   function applyRun(run) {
     var stages = run.stages || {};
     MAIN_LINE.forEach(function (def) { applyStatus(def.key, (stages[def.key] || {}).status || "pending"); });
-    applyStatus("researcher", (stages.researcher || {}).status === "pending" ? "pending" : (stages.researcher || {}).status || "pending");
+    applyStatus("researcher", (stages.researcher || {}).status || "pending");
 
-    // pulse travels toward whichever main-line stage is currently "running"
-    var runningIdx = -1;
-    MAIN_LINE.forEach(function (def, i) { if ((stages[def.key] || {}).status === "running") runningIdx = i; });
-    pulse.userData.active = runningIdx > 0;
-    if (runningIdx > 0) {
-      pulse.userData.from = nodePositions[MAIN_LINE[runningIdx - 1].key];
-      pulse.userData.to = nodePositions[MAIN_LINE[runningIdx].key];
-      pulseMat.opacity = 0.9;
-    } else if ((stages.researcher || {}).status === "running") {
-      pulse.userData.from = nodePositions.plan;
-      pulse.userData.to = nodePositions.researcher;
-      pulseMat.opacity = 0.9;
+    // supervisor hovers over whichever room is currently running (main line takes
+    // priority over the researcher spur when, unusually, both are active at once)
+    var activeKey = null;
+    MAIN_LINE.forEach(function (def) { if ((stages[def.key] || {}).status === "running") activeKey = def.key; });
+    if (!activeKey && (stages.researcher || {}).status === "running") activeKey = "researcher";
+    supervisor.userData.active = !!activeKey;
+    if (activeKey) {
+      var l = ROOM_LAYOUT[activeKey];
+      supervisor.userData.target = new THREE.Vector3(l.x, WALL_HEIGHT + 0.5, l.z);
+      supervisorMat.opacity = 0.85;
     } else {
-      pulseMat.opacity = 0;
+      supervisorMat.opacity = 0;
     }
   }
 
@@ -666,38 +655,47 @@
     var t = clock.getElapsedTime();
 
     if (!reduceMotion) {
-      var angle = t * 0.12;
-      camera.position.set(Math.sin(angle) * 8.5, 2.6 + Math.sin(t * 0.2) * 0.4, Math.cos(angle) * 8.5);
+      var angle = t * 0.1;
+      camera.position.set(Math.sin(angle) * 9.5, 6.2 + Math.sin(t * 0.2) * 0.3, Math.cos(angle) * 9.5);
     } else {
-      camera.position.set(8.5, 2.6, 0);
+      camera.position.set(9.5, 6.2, 0);
     }
-    camera.lookAt(0, -0.2, 0);
+    camera.lookAt(0, 0, 0);
 
-    Object.keys(nodeMeshes).forEach(function (key) {
-      var mesh = nodeMeshes[key];
-      var pulseAmt = mesh.userData.status === "running" && !reduceMotion ? 1 + Math.sin(t * 4) * 0.12 : 1;
-      mesh.scale.setScalar(pulseAmt);
-      mesh.rotation.y += reduceMotion ? 0 : 0.006;
-      mesh.rotation.x += reduceMotion ? 0 : 0.003;
+    Object.keys(rooms).forEach(function (key) {
+      var room = rooms[key];
+      var targetY;
+      if (room.status === "done" || room.status === "blocked") {
+        targetY = 1;
+      } else if (room.status === "running") {
+        // a slow, continuous rise-and-settle rather than a hard snap, so a room
+        // that's been "running" a while visibly keeps being worked on
+        targetY = reduceMotion ? 0.9 : 0.55 + Math.sin(t * 1.1 + room.phase) * 0.12 + 0.35;
+      } else {
+        targetY = 0.0001;
+      }
+      room.wall.scale.y += (targetY - room.wall.scale.y) * (reduceMotion ? 1 : 0.08);
+
+      if (room.status === "running" && !reduceMotion) {
+        room.windows.forEach(function (w, i) {
+          w.material.opacity = 0.35 + Math.abs(Math.sin(t * 6 + room.phase + i)) * 0.45;
+          w.material.color.setHex(0xd98a3d);
+        });
+      }
+      if (room.status === "blocked" && !reduceMotion) {
+        var flash = 0.4 + Math.abs(Math.sin(t * 5)) * 0.6;
+        room.beacon.material.opacity = flash;
+        room.beacon.scale.setScalar(1 + Math.sin(t * 5) * 0.15);
+      }
     });
 
-    if (pulse.userData.active && !reduceMotion) {
-      var p = (Math.sin(t * 2.2) + 1) / 2;
-      pulse.position.lerpVectors(pulse.userData.from, pulse.userData.to, p);
+    if (supervisor.userData.active && !reduceMotion) {
+      supervisor.position.lerp(supervisor.userData.target, 0.06);
+      supervisor.position.y = supervisor.userData.target.y + Math.sin(t * 3) * 0.08;
+      supervisor.rotation.y += 0.05;
+    } else if (supervisor.userData.active) {
+      supervisor.position.copy(supervisor.userData.target);
     }
-
-    Object.keys(builders).forEach(function (key) {
-      var b = builders[key];
-      if (reduceMotion) return;
-      var swing = t * 9 + b.phase;
-      // hammer arm swings from raised to a sharp downstroke
-      b.armPivot.rotation.x = -0.9 + Math.max(0, Math.sin(swing)) * 1.7;
-      b.group.position.y += Math.sin(t * 5 + b.phase) * 0.0008; // gentle idle bob
-      // spark flashes right at the bottom of the downstroke
-      var hit = Math.pow(Math.max(0, Math.sin(swing - Math.PI / 2)), 10);
-      b.spark.material.opacity = hit * 0.9;
-      b.spark.scale.setScalar(0.16 + hit * 0.14);
-    });
 
     renderer.render(scene, camera);
   }

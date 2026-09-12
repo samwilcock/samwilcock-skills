@@ -15,7 +15,7 @@ Any specialist that hits an issue implying the plan itself was wrong (not just a
 
 ## Live visualization (optional)
 
-A published Artifact — **Pipeline Control Room** — renders the pipeline as a live 3D tracker: each stage lights up as it starts/finishes, with a status ledger alongside. It's a dashboard, not a single-run view — every project currently running `/dev-team` shows up as its own chip in a rail at the top, so you can see multiple teams/projects at a glance and click into whichever one you want.
+A published Artifact — **Pipeline Control Room** — renders the pipeline as a house being built: each stage is a room that rises from a blueprint footprint to full walls and a roof as it completes. It opens on a dashboard — a card per project currently running `/dev-team`, showing what it's building, its progress at a glance, and when it last updated — click a card to enter that project's live floorplan and stage ledger, with a rail at the top to jump straight to another project without going back.
 
 To enable it:
 1. Publish your own copy of the Pipeline Control Room artifact — the source lives at [`viz/pipeline-control-room.html`](viz/pipeline-control-room.html) in this repo — with the `db` capability (ask Claude to publish it for you).

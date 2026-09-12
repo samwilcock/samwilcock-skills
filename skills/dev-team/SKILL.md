@@ -1,6 +1,6 @@
 ---
 name: dev-team
-description: Run a feature request through a specialist dev team using TDD - project manager plans it (with researcher support, approved by the user before anything is built), a designer produces UI design when needed, a test engineer writes failing tests, frontend/backend engineers implement only the disciplines needed (in parallel when both apply), a tester verifies, and a reviewer does final code review. Any issue found along the way loops back to the project manager for re-planning. Progress persists to disk so a run can be paused and resumed (e.g. around a /compact) without losing state. Use when the user asks to build/implement a feature with the "dev team", or explicitly invokes /dev-team.
+description: Run a feature request through a specialist dev team using TDD - project manager plans it (with researcher support, approved by the user before anything is built), a designer produces UI design when needed, a test engineer writes failing tests, a database engineer builds schema/migrations when needed, frontend/backend/devops engineers implement only the disciplines needed (in parallel where possible), a tester verifies, and a reviewer does final code review. Any issue found along the way loops back to the project manager for re-planning. Progress persists to disk so a run can be paused and resumed (e.g. around a /compact) without losing state. Use when the user asks to build/implement a feature with the "dev team", or explicitly invokes /dev-team.
 ---
 
 # Dev Team
@@ -15,9 +15,9 @@ If `~/.claude/dev-team-viz.json` exists and has a `url` field, it points to a pu
 
 When a viz URL is configured:
 1. Compute a project doc id from the current working directory: take its basename, lowercase it, replace any character outside `a-z0-9-` with `-`, and collapse repeats (e.g. `/Users/sam/Dev/checkout-flow` → `checkout-flow`). This keeps concurrent runs in different projects from colliding — each writes to `runs/<that id>`, never `runs/current`.
-2. At the start of a run, use the Artifact tool (`action: "write_db"`, `db_op: "set"`, that `url`, `collection: "runs"`, `doc_id: "<project id>"`) to write the initial document: `projectName` (the same basename, unslugified), `feature`, a generated `runId`, `startedAt` (ISO), `updatedAt`, `current: "plan"`, and a `stages` object with every stage key (`plan`, `approval`, `design`, `tests`, `frontend`, `backend`, `verify`, `review`, `researcher`) set to `{status: "pending"}`.
+2. At the start of a run, use the Artifact tool (`action: "write_db"`, `db_op: "set"`, that `url`, `collection: "runs"`, `doc_id: "<project id>"`) to write the initial document: `projectName` (the same basename, unslugified), `feature`, a generated `runId`, `startedAt` (ISO), `updatedAt`, `current: "plan"`, and a `stages` object with every stage key (`plan`, `approval`, `design`, `tests`, `database`, `frontend`, `backend`, `devops`, `verify`, `review`, `researcher`) set to `{status: "pending"}`.
 3. Immediately before invoking each specialist, `update` that document: set that stage's status to `"running"` and `current` to its key, `updatedAt` to now.
-4. Immediately after a specialist reports back, `update` again: status to `"done"` (or `"blocked"` if it raised an issue per the Core rule, or `"skipped"` for `design`/`frontend`/`backend` when the plan doesn't require that discipline), plus a one-sentence `summary` of what it reported, and `updatedAt`.
+4. Immediately after a specialist reports back, `update` again: status to `"done"` (or `"blocked"` if it raised an issue per the Core rule, or `"skipped"` for `design`/`database`/`frontend`/`backend`/`devops` when the plan doesn't require that discipline), plus a one-sentence `summary` of what it reported, and `updatedAt`.
 5. On a loop back to `project-manager`, reset the stages being redone to `"pending"` before re-running them.
 6. Use `if_version` (from the last read/write of that document) on every update to avoid clobbering a concurrent write — this matters more now that multiple runs may write to the same artifact's database (different docs, but still worth pinning).
 
@@ -39,7 +39,7 @@ A long run (several agents, possibly a loop-back or two) can grow your own conte
 
 ## Core rule: issues always go back to the project manager
 
-Any specialist (designer, test-engineer, frontend-engineer, backend-engineer, tester, reviewer) can surface an issue that isn't a simple "fix this line" bug — a bad assumption in the plan, a missing/wrong acceptance criterion, an untestable requirement, a design that doesn't fit the implementation, a reviewer finding that implies a scope change. Whenever that happens:
+Any specialist (designer, test-engineer, database-engineer, frontend-engineer, backend-engineer, devops-engineer, tester, reviewer) can surface an issue that isn't a simple "fix this line" bug — a bad assumption in the plan, a missing/wrong acceptance criterion, an untestable requirement, a design that doesn't fit the implementation, a reviewer finding that implies a scope change. Whenever that happens:
 
 1. Do not try to resolve it yourself or route it straight back to the engineer who hit it.
 2. Send it to `project-manager` with: the original plan, which stage found the issue, and the issue itself.
@@ -69,16 +69,20 @@ Small, purely mechanical fixes an engineer can resolve within their own step (a 
 4. **Write failing tests — `test-engineer`**
    Pass the plan (and the designer's notes, if any) to `test-engineer`. It writes tests against the acceptance criteria and confirms they fail for the right reason. It reports which disciplines each failing test implies — use this, not just the plan's stated disciplines, to decide which engineers to invoke next.
 
-5. **Implement — `frontend-engineer` / `backend-engineer`**
-   Invoke only the engineer(s) the failing tests actually require. If both are required, invoke them **in parallel** in a single message (two Agent tool calls together) since their work is normally separable — each should get the plan (plus designer notes, if any) and only the tests/criteria relevant to their discipline. If only one discipline is required, invoke only that one.
-   - If both engineers reported touching shared/overlapping code, check for conflicts (e.g. re-read the touched files) before moving on.
+5. **Database — `database-engineer`** *(only if the approved plan requires `database`)*
+   Pass the plan and the relevant failing tests to `database-engineer`. It designs and applies the schema/migration change and reports the field-name contract the backend needs. Run this **before** step 6 — `backend-engineer` typically builds against the schema it produces, so don't invoke them in parallel with each other.
+   - If it reports an issue with the plan (ambiguous or contradictory data requirements), send it back to `project-manager` per the Core rule, then re-run the approval gate on any revision before continuing.
 
-6. **Verify — `tester`**
+6. **Implement — `frontend-engineer` / `backend-engineer` / `devops-engineer`**
+   Invoke only the engineer(s) the failing tests actually require. Their work is normally separable, so invoke however many of the three are required **in parallel**, in a single message (one Agent tool call per engineer, together) — each should get the plan (plus designer notes and the database contract, if any) and only the tests/criteria relevant to their discipline. If only one discipline is required, invoke only that one.
+   - If multiple engineers reported touching shared/overlapping code, check for conflicts (e.g. re-read the touched files) before moving on.
+
+7. **Verify — `tester`**
    Pass the plan and a summary of what was implemented to `tester`. It independently runs the suite and reports a verdict.
-   - Failures caused by the implementation (not the plan) go straight back to the relevant engineer(s) (step 5) for another pass, then re-run `tester`. Don't loop more than twice this way without surfacing the situation to the user.
+   - Failures caused by the implementation (not the plan) go straight back to the relevant engineer(s) (step 5 or 6) for another pass, then re-run `tester`. Don't loop more than twice this way without surfacing the situation to the user.
    - Anything that suggests the plan itself was wrong or incomplete (untested/untestable acceptance criteria, a criterion that turned out to be unsatisfiable as written) goes to `project-manager` per the Core rule instead.
 
-7. **Review — `reviewer`**
+8. **Review — `reviewer`**
    Once `tester` gives a passing verdict, invoke `reviewer` on the final diff. Relay its findings to the user as-is — do not silently apply fixes on its behalf unless the user asks you to. If a finding implies the plan was wrong (not just a code-quality nit), route it to `project-manager` per the Core rule.
 
 ## Reporting back
@@ -99,5 +103,5 @@ This pipeline's cost is dominated by (a) how much context each agent is handed a
 - **Don't re-plan on every loop.** When `project-manager` revises a plan after an issue, it should patch the existing plan, not regenerate it from scratch — pass it the prior plan, not the original request again.
 - **Don't redo unaffected stages.** A loop-back only reruns the stages the revision actually touches (Core rule already says this — it's also the token-cheap choice).
 - **Keep agent reports short by design.** Each agent's own instructions ask for a report, not a transcript — don't ask an agent to "explain your reasoning" or "walk through what you did" unless actually debugging a failure.
-- **Cap retry loops.** The two-loop cap on `tester` failures (step 6) exists partly for cost: an unbounded fix-verify loop burns tokens without new information after a couple of tries — surface it to the user instead.
+- **Cap retry loops.** The two-loop cap on `tester` failures (step 7) exists partly for cost: an unbounded fix-verify loop burns tokens without new information after a couple of tries — surface it to the user instead.
 - **Skip the viz write on failure, don't retry it.** A failed visualization update is not worth spending a retry's tokens on — catch and drop it (already stated above).

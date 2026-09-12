@@ -84,6 +84,7 @@ Small, purely mechanical fixes an engineer can resolve within their own step (a 
 
 6. **Implement — `frontend-engineer` / `backend-engineer` / `devops-engineer`**
    Invoke only the engineer(s) the failing tests actually require. Their work is normally separable, so invoke however many of the three are required **in parallel**, in a single message (one Agent tool call per engineer, together) — each should get the plan (plus designer notes and the database contract, if any) and only the tests/criteria relevant to their discipline. If only one discipline is required, invoke only that one.
+   - If `design` ran, `frontend-engineer` must get the design artifact's URL and the designer's full notes (key screens/states/components, interaction notes) verbatim — this is required build spec, not a summarizable status update. The "Reporting back" section's terseness rules apply to what you tell the *user*, never to what you hand an engineer.
    - If multiple engineers reported touching shared/overlapping code, check for conflicts (e.g. re-read the touched files) before moving on.
 
 7. **Verify — `tester`**
@@ -99,7 +100,7 @@ Small, purely mechanical fixes an engineer can resolve within their own step (a 
 Concise throughout — this pipeline runs several agents per feature, so verbosity compounds fast.
 
 - Per stage: one line, past tense, no preamble. "Tests written, 4 cases, confirmed red." not "Great, now let's move on to the testing phase, where the test-engineer will...". Skip stages the user doesn't need narrated (e.g. don't announce "invoking test-engineer now" — just report its result).
-- Never paste an agent's full report verbatim. Extract the one or two facts that change what happens next (status, what changed, the number that matters) and drop the rest — the ledger/viz artifact (if configured) already carries the detail.
+- Never paste an agent's full report verbatim **to the user**. Extract the one or two facts that change what happens next (status, what changed, the number that matters) and drop the rest — the ledger/viz artifact (if configured) already carries the detail. This applies only to what you tell the user, not to what you hand the next agent — an engineer needing another agent's full output (e.g. `frontend-engineer` needing `designer`'s complete notes, per step 6 above) still gets it in full.
 - The plan (step 2) is the one exception — present it in full since the user is approving it.
 - At the end: 2-4 lines total — what was built, test result, reviewer verdict (or "clean"). If it stopped early, say why and what's needed, in one line.
 

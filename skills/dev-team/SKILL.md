@@ -1,6 +1,6 @@
 ---
 name: dev-team
-description: Run a feature request through a specialist dev team using TDD - project manager plans it (with researcher support, approved by the user before anything is built), a designer produces UI design when needed, a test engineer writes failing tests, frontend/backend engineers implement only the disciplines needed (in parallel when both apply), a tester verifies, and a reviewer does final code review. Any issue found along the way loops back to the project manager for re-planning. Use when the user asks to build/implement a feature with the "dev team", or explicitly invokes /dev-team.
+description: Run a feature request through a specialist dev team using TDD - project manager plans it (with researcher support, approved by the user before anything is built), a designer produces UI design when needed, a test engineer writes failing tests, frontend/backend engineers implement only the disciplines needed (in parallel when both apply), a tester verifies, and a reviewer does final code review. Any issue found along the way loops back to the project manager for re-planning. Progress persists to disk so a run can be paused and resumed (e.g. around a /compact) without losing state. Use when the user asks to build/implement a feature with the "dev team", or explicitly invokes /dev-team.
 ---
 
 # Dev Team
@@ -23,6 +23,20 @@ When a viz URL is configured:
 
 Keep this lightweight: one or two short tool calls per stage transition, never more, and never let a failed viz write interrupt or slow down the actual pipeline — catch and ignore errors from it.
 
+## Run state, pausing, and resuming
+
+A long run (several agents, possibly a loop-back or two) can grow your own context enough that a `/compact` becomes worth doing mid-pipeline. Since compaction summarizes the conversation, the pipeline's actual progress needs to live somewhere durable that isn't your context — so every run persists its state to a local file, independent of whether visualization is configured:
+
+`~/.claude/dev-team-runs/<project-id>.json` (same slugging rule as the viz doc id — see above), written directly with the Write/Edit tools (this is local state, not the Artifact tool's db — that's only for the optional viz). Update it at exactly the same moments you'd update the viz doc (run start, before/after each stage, on loop-back), whether or not a viz URL is configured. It holds: `feature`, the full current `plan` text, `approved` (bool), `stages` (status + summary per stage, same shape as the viz doc), `current`, `loopCount` (times sent back to `project-manager`), `createdAt`, `updatedAt`.
+
+**At the start of every `/dev-team` invocation:** check whether this file already exists for the current project. If it does and isn't finished, tell the user a paused run was found (feature + current stage) and ask whether to resume it or discard it and start fresh — don't silently pick one. Resuming means: load the plan (skip re-planning and re-approval if `approved` is already true), skip every stage already `"done"`/`"skipped"`, and continue from `current`.
+
+**Pausing:** if the user asks to pause (or you're about to suggest a `/compact`, see below), finish or abandon the in-flight specialist call cleanly, make sure the state file is fully up to date, then tell them in one line that it's safe to `/compact` or end the session now, and that running `/dev-team` again in this project will pick up right where it left off. Don't keep going past that point in the same turn.
+
+**Finishing:** once the run reaches a terminal state (`reviewer` reports, or the user abandons it), delete the state file — a stale "paused run found" prompt on the next invocation is worse than no state at all.
+
+**Flagging heavy context:** after the 2nd loop-back to `project-manager` in a single run (Core rule below), say so explicitly and suggest pausing: "This is the Nth time we've looped back — context is growing. Want to pause here and `/compact` before continuing?" Don't force it — just offer, using the pause flow above if they say yes.
+
 ## Core rule: issues always go back to the project manager
 
 Any specialist (designer, test-engineer, frontend-engineer, backend-engineer, tester, reviewer) can surface an issue that isn't a simple "fix this line" bug — a bad assumption in the plan, a missing/wrong acceptance criterion, an untestable requirement, a design that doesn't fit the implementation, a reviewer finding that implies a scope change. Whenever that happens:
@@ -36,6 +50,8 @@ Small, purely mechanical fixes an engineer can resolve within their own step (a 
 
 ## Pipeline
 
+0. **Check for a paused run** (see Run state above) before doing anything else. If one exists for this project, ask the user whether to resume or discard it. Resuming jumps straight to the saved `current` stage; discarding deletes the old state file and proceeds to step 1 as normal.
+
 1. **Plan — `project-manager`**
    Summarize the feature request and relevant conversation context (the agent has no memory of this chat) and pass it to the `project-manager` agent. It returns a plan: summary, scope, acceptance criteria, required disciplines (`design`/`frontend`/`backend`, any combination), and open questions.
    - If it raises open questions, ask the user before continuing rather than guessing.
@@ -44,6 +60,7 @@ Small, purely mechanical fixes an engineer can resolve within their own step (a 
    Present the full plan to the user (summary, scope, acceptance criteria, disciplines required) and ask them to accept it, request changes, or reject it. Do not proceed past this point without explicit approval.
    - If they request changes, send that feedback to `project-manager` as a revision (see Core rule above) and re-present the revised plan. Repeat until approved.
    - Only once approved does the plan's `design` flag get acted on and implementation begin.
+   - The moment it's approved and work begins, if a viz URL is configured (see below), give the user that URL so they can watch the run live — one line, e.g. "Watch live: <url>". Don't wait until the pipeline finishes to mention it.
 
 3. **Design — `designer`** *(only if the approved plan requires `design`)*
    Pass the approved plan to `designer`. It uses the `design` skill to produce the design artifact and reports back key screens/states/components and implementation notes for the frontend engineer.
@@ -66,4 +83,21 @@ Small, purely mechanical fixes an engineer can resolve within their own step (a 
 
 ## Reporting back
 
-After each stage, give the user a short (1-3 sentence) status update — not the full agent transcript. At the end, summarize: what was built, test results, and the reviewer's findings (or that it was clean). If the pipeline stopped early (pending approval, repeated failures), say why and what's needed to continue.
+Concise throughout — this pipeline runs several agents per feature, so verbosity compounds fast.
+
+- Per stage: one line, past tense, no preamble. "Tests written, 4 cases, confirmed red." not "Great, now let's move on to the testing phase, where the test-engineer will...". Skip stages the user doesn't need narrated (e.g. don't announce "invoking test-engineer now" — just report its result).
+- Never paste an agent's full report verbatim. Extract the one or two facts that change what happens next (status, what changed, the number that matters) and drop the rest — the ledger/viz artifact (if configured) already carries the detail.
+- The plan (step 2) is the one exception — present it in full since the user is approving it.
+- At the end: 2-4 lines total — what was built, test result, reviewer verdict (or "clean"). If it stopped early, say why and what's needed, in one line.
+
+## Reducing token usage
+
+This pipeline's cost is dominated by (a) how much context each agent is handed and (b) how much it reads before acting. Keep both tight:
+
+- **Hand agents only what they need.** Don't forward an entire prior agent's report to the next one — extract the relevant fields (e.g. pass `test-engineer`'s failing-test list to the right engineer, not its full reasoning). Never forward your own conversation history; agents don't need it and can't use it.
+- **Prefer `researcher` over ad-hoc exploration.** Any agent facing "does X exist / where does Y live" should delegate to `researcher` (haiku, cheap) rather than Grep/Read-ing around itself. This is already in `project-manager`'s instructions — apply the same instinct yourself as orchestrator.
+- **Don't re-plan on every loop.** When `project-manager` revises a plan after an issue, it should patch the existing plan, not regenerate it from scratch — pass it the prior plan, not the original request again.
+- **Don't redo unaffected stages.** A loop-back only reruns the stages the revision actually touches (Core rule already says this — it's also the token-cheap choice).
+- **Keep agent reports short by design.** Each agent's own instructions ask for a report, not a transcript — don't ask an agent to "explain your reasoning" or "walk through what you did" unless actually debugging a failure.
+- **Cap retry loops.** The two-loop cap on `tester` failures (step 6) exists partly for cost: an unbounded fix-verify loop burns tokens without new information after a couple of tries — surface it to the user instead.
+- **Skip the viz write on failure, don't retry it.** A failed visualization update is not worth spending a retry's tokens on — catch and drop it (already stated above).

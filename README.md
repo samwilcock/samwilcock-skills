@@ -11,11 +11,9 @@ A Claude Code plugin that gives you a specialist dev team, orchestrated via TDD:
 ## Install
 
 ```
-/plugin marketplace add samuelwilcock/dev-team
+/plugin marketplace add samwilcock/samwilcock-skills
 /plugin install dev-team
 ```
-
-(Replace `samuelwilcock/dev-team` with wherever you publish this repo, e.g. `<github-org>/<repo>` or a full URL.)
 
 ## Use
 

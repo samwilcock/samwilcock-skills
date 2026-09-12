@@ -1,0 +1,19 @@
+name: Validate plugin
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate manifests and agent/skill frontmatter
+        run: ./scripts/validate-plugin.sh
+
+      - name: Check version bump on agent/skill/manifest changes
+        run: BASE_REF=origin/${{ github.base_ref }} ./scripts/check-version-bump.sh

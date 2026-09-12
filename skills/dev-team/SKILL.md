@@ -25,6 +25,10 @@ When a viz URL is configured:
 
 Keep this lightweight: one or two short tool calls per stage transition, never more, and never let a failed viz write block or slow down the actual pipeline — but don't swallow the failure silently either. The **first** time a viz write fails in a run, tell the user in one line ("live viz isn't syncing — continuing without it") and keep going; don't mention it again for the rest of that run, and don't retry. The local run-state file (see below) is unaffected either way — it's written directly, not through the viz path, so pipeline progress is never at risk even when viz is broken.
 
+**Announcing the URL and keeping writes going are standalone rules, not tied to any one pipeline step:**
+- The **first time** you're about to invoke a specialist in a given session — whether that's the normal flow (right after the plan is approved, step 2) or a resumed run jumping straight into a later stage (step 0) — say "Watch live: `<url>`" once, in that same turn, before or alongside your first status update. Don't gate this on which step got you there; check it independently every time a run is about to start doing work.
+- The **per-stage `update` calls** (steps 3–4 above) apply on every stage transition, full stop, regardless of whether the pipeline reached that stage by normal step-by-step progression or by jumping in via resume. A resumed run picking up at `verify` still writes `verify`'s `"running"`/`"done"` updates exactly as a fresh run would — resuming changes where you start, not whether you keep writing.
+
 ## Run state, pausing, and resuming
 
 A long run (several agents, possibly a loop-back or two) can grow your own context enough that a `/compact` becomes worth doing mid-pipeline. Since compaction summarizes the conversation, the pipeline's actual progress needs to live somewhere durable that isn't your context — so every run persists its state to a local file, independent of whether visualization is configured:
@@ -59,7 +63,7 @@ Small, purely mechanical fixes an engineer can resolve within their own step (a 
 ## Pipeline
 
 0. **Check for a paused run** (see Run state above) before doing anything else. If one exists for this project, ask the user whether to resume or discard it. Resuming jumps straight to the saved `current` stage; discarding archives the old state file (per Finishing, below) and proceeds to step 1 as normal — the user explicitly choosing to discard is exactly the "abandoned" case. If none is active but an archived one exists, mention it briefly.
-   - On resume, if a viz URL is configured, give it to the user again in the same "Watch live: <url>" line as step 2 below — don't assume they still have the tab open from before the pause.
+   - Resuming counts as "about to start work" — see the standalone URL-announcement rule in Live visualization above. Don't assume the user still has last session's tab open.
 
 1. **Plan — `project-manager`**
    Summarize the feature request and relevant conversation context (the agent has no memory of this chat) and pass it to the `project-manager` agent. It returns a plan: summary, scope, acceptance criteria, required disciplines (`design`/`database`/`frontend`/`backend`/`devops`, any combination), and open questions.
@@ -69,7 +73,7 @@ Small, purely mechanical fixes an engineer can resolve within their own step (a 
    Present the full plan to the user (summary, scope, acceptance criteria, disciplines required) and ask them to accept it, request changes, or reject it. Do not proceed past this point without explicit approval.
    - If they request changes, send that feedback to `project-manager` as a revision (see Core rule above) and re-present the revised plan. Repeat until approved.
    - Only once approved does the plan's `design` flag get acted on and implementation begin.
-   - The moment it's approved and work begins, if a viz URL is configured (see below), give the user that URL so they can watch the run live — one line, e.g. "Watch live: <url>". Don't wait until the pipeline finishes to mention it.
+   - Approval counts as "about to start work" — see the standalone URL-announcement rule in Live visualization above.
 
 3. **Design — `designer`** *(only if the approved plan requires `design`)*
    Pass the approved plan to `designer`. It uses the `design` skill to produce the design artifact and reports back key screens/states/components and implementation notes for the frontend engineer.

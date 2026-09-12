@@ -516,10 +516,12 @@
     { key: "approval", code: "02", name: "Approval",         agent: "you",              model: null },
     { key: "design",   code: "03", name: "Design",           agent: "designer",         model: "sonnet" },
     { key: "tests",    code: "04", name: "Tests · RED",      agent: "test-engineer",    model: "sonnet" },
-    { key: "frontend", code: "05a", name: "Build · FE",      agent: "frontend-engineer",model: "sonnet" },
-    { key: "backend",  code: "05b", name: "Build · BE",      agent: "backend-engineer", model: "sonnet" },
-    { key: "verify",   code: "06", name: "Verify · GREEN",   agent: "tester",           model: "sonnet" },
-    { key: "review",   code: "07", name: "Review",           agent: "reviewer",         model: "sonnet" }
+    { key: "database", code: "05", name: "Database",         agent: "database-engineer",model: "sonnet" },
+    { key: "frontend", code: "06a", name: "Build · FE",      agent: "frontend-engineer",model: "sonnet" },
+    { key: "backend",  code: "06b", name: "Build · BE",      agent: "backend-engineer", model: "sonnet" },
+    { key: "devops",   code: "06c", name: "Build · Ops",     agent: "devops-engineer",  model: "sonnet" },
+    { key: "verify",   code: "07", name: "Verify · GREEN",   agent: "tester",           model: "sonnet" },
+    { key: "review",   code: "08", name: "Review",           agent: "reviewer",         model: "sonnet" }
   ];
   var SPUR = { key: "researcher", name: "Research", agent: "researcher", model: "haiku" };
 
@@ -542,8 +544,10 @@
         approval: { status: "done", summary: "Plan accepted by user without changes." },
         design:   { status: "skipped", summary: "Not required — no UI surface in this feature." },
         tests:    { status: "done", summary: "4 jest cases written against acceptance criteria; confirmed red before implementation." },
+        database: { status: "skipped", summary: "No persistent data involved — pure function only." },
         frontend: { status: "skipped", summary: "Not required for this feature." },
         backend:  { status: "done", summary: "slugify.js implemented; all 4 new tests pass locally." },
+        devops:   { status: "skipped", summary: "No CI/deploy changes needed." },
         verify:   { status: "done", summary: "Full suite green, no regressions, all acceptance criteria covered." },
         review:   { status: "done", summary: "Clean — no findings. Matches existing module conventions." },
         researcher: { status: "done", summary: "Checked for an existing slug helper before planning — none found.", calls: 1 }
@@ -653,15 +657,18 @@
   scene.add(siteGrid);
 
   var ROOM_LAYOUT = {
-    plan:       { x: -5.25, z: 0,    w: 1.55, d: 1.35 },
-    approval:   { x: -3.5,  z: 0,    w: 1.55, d: 1.35 },
-    design:     { x: -1.75, z: 0,    w: 1.55, d: 1.35 },
-    tests:      { x: 0,     z: 0,    w: 1.55, d: 1.35 },
-    frontend:   { x: 1.75,  z: -0.42, w: 1.55, d: 0.58 },
-    backend:    { x: 1.75,  z: 0.42,  w: 1.55, d: 0.58 },
-    verify:     { x: 3.5,   z: 0,    w: 1.55, d: 1.35 },
-    review:     { x: 5.25,  z: 0,    w: 1.55, d: 1.35 },
-    researcher: { x: -5.25, z: -2.15, w: 1.05, d: 0.95 }
+    plan:       { x: -6.125, z: 0,    w: 1.55, d: 1.35 },
+    approval:   { x: -4.375, z: 0,    w: 1.55, d: 1.35 },
+    design:     { x: -2.625, z: 0,    w: 1.55, d: 1.35 },
+    tests:      { x: -0.875, z: 0,    w: 1.55, d: 1.35 },
+    database:   { x: 0.875,  z: 0,    w: 1.55, d: 1.35 },
+    // the "build" wing: three rooms side by side, since these engineers work in parallel
+    frontend:   { x: 2.625,  z: -0.45, w: 1.55, d: 0.4 },
+    backend:    { x: 2.625,  z: 0,     w: 1.55, d: 0.4 },
+    devops:     { x: 2.625,  z: 0.45,  w: 1.55, d: 0.4 },
+    verify:     { x: 4.375,  z: 0,    w: 1.55, d: 1.35 },
+    review:     { x: 6.125,  z: 0,    w: 1.55, d: 1.35 },
+    researcher: { x: -6.125, z: -2.15, w: 1.05, d: 0.95 }
   };
   var WALL_HEIGHT = 0.85;
 
@@ -729,10 +736,14 @@
 
   Object.keys(ROOM_LAYOUT).forEach(function (key) { makeRoom(key, ROOM_LAYOUT[key]); });
 
-  // walkway connecting the main-line rooms, plus a spur path out to the site office
-  var walkPts = MAIN_LINE.filter(function (d) { return d.key !== "frontend" && d.key !== "backend"; })
-    .map(function (d) { return new THREE.Vector3(ROOM_LAYOUT[d.key].x, 0.015, 0); });
-  walkPts.splice(4, 0, new THREE.Vector3(ROOM_LAYOUT.frontend.x, 0.015, 0));
+  // walkway connecting the main-line rooms, plus a spur path out to the site office.
+  // Rooms sharing an x (the frontend/backend/devops wing) collapse to one waypoint.
+  var walkPts = [];
+  MAIN_LINE.forEach(function (d) {
+    var x = ROOM_LAYOUT[d.key].x;
+    var last = walkPts[walkPts.length - 1];
+    if (!last || last.x !== x) walkPts.push(new THREE.Vector3(x, 0.015, 0));
+  });
   var walkGeo = new THREE.BufferGeometry().setFromPoints(walkPts);
   var walkMat = new THREE.LineBasicMaterial({ color: 0x2b2e42, transparent: true, opacity: 0.8 });
   scene.add(new THREE.Line(walkGeo, walkMat));

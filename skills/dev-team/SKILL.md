@@ -1,11 +1,13 @@
 ---
 name: dev-team
-description: Run a feature request through a specialist dev team using TDD - project manager plans it (approved by the user before anything is built), a designer produces UI design when needed, a test engineer writes failing tests, frontend/backend engineers implement only the disciplines needed (in parallel when both apply), a tester verifies, and a reviewer does final code review. Any issue found along the way loops back to the project manager for re-planning. Use when the user asks to build/implement a feature with the "dev team", or explicitly invokes /dev-team.
+description: Run a feature request through a specialist dev team using TDD - project manager plans it (with researcher support, approved by the user before anything is built), a designer produces UI design when needed, a test engineer writes failing tests, frontend/backend engineers implement only the disciplines needed (in parallel when both apply), a tester verifies, and a reviewer does final code review. Any issue found along the way loops back to the project manager for re-planning. Use when the user asks to build/implement a feature with the "dev team", or explicitly invokes /dev-team.
 ---
 
 # Dev Team
 
 Orchestrate a fixed pipeline of specialist subagents (defined in this plugin's `agents/` directory) to take a feature request from discussion to reviewed, tested code using TDD. You are the orchestrator: call each agent via the Agent tool, pass along what it needs, and use its report to decide what happens next. Do not do the specialists' work yourself — delegate it, and keep the user informed with brief status updates between stages.
+
+`researcher` is a fast, cheap lookup agent (not a pipeline stage) — `project-manager` can call it directly for quick codebase questions or external tool/method research while planning. You (the orchestrator) may also call it directly if you need a quick answer to route the pipeline correctly.
 
 ## Core rule: issues always go back to the project manager
 

@@ -31,11 +31,17 @@ A long run (several agents, possibly a loop-back or two) can grow your own conte
 
 `~/.claude/dev-team-runs/<project-id>.json` (same slugging rule as the viz doc id — see above), written directly with the Write/Edit tools (this is local state, not the Artifact tool's db — that's only for the optional viz). Update it at exactly the same moments you'd update the viz doc (run start, before/after each stage, on loop-back), whether or not a viz URL is configured — including a fresh real `date -u` timestamp each time (see above). It holds: `feature`, the full current `plan` text, `approved` (bool), `stages` (status + summary per stage, same shape as the viz doc), `current`, `loopCount` (times sent back to `project-manager`), `createdAt`, `updatedAt`.
 
+**`current` is always one of the fixed stage keys** — `plan`, `approval`, `design`, `tests`, `database`, `frontend`, `backend`, `devops`, `verify`, `review`, or `researcher`. Never invent a pseudo-stage name for a loop-back or a scoped fix (e.g. don't write `current: "backend-contract-patch"`) — resume matches `current` against this fixed list, and an unrecognized value breaks it silently. If a `project-manager` revision only requires redoing part of one stage, that's still just that stage: reset it to `"pending"` and put whatever extra detail the redo needs (what changed, why, what to fix) in that stage's own `note` field, not in `current` or a new top-level field.
+
 **At the start of every `/dev-team` invocation:** check whether this file already exists for the current project. If it does and isn't finished, tell the user a paused run was found (feature + current stage) and ask whether to resume it or discard it and start fresh — don't silently pick one. Resuming means: load the plan (skip re-planning and re-approval if `approved` is already true), skip every stage already `"done"`/`"skipped"`, and continue from `current`.
+- If the stage named by `current` has status `"running"`, the previous session was interrupted mid-call — no result was ever recorded, so treat it as **not started**: re-invoke that specialist from scratch (with that stage's `note`, if any) rather than assuming partial progress.
+- If `current` doesn't match one of the fixed stage keys (an older or corrupted state file), don't restart the whole pipeline — fall back to the earliest stage, in pipeline order, whose status isn't `"done"`/`"skipped"`, and resume there.
 
 **Pausing:** if the user asks to pause (or you're about to suggest a `/compact`, see below), finish or abandon the in-flight specialist call cleanly, make sure the state file is fully up to date, then tell them in one line that it's safe to `/compact` or end the session now, and that running `/dev-team` again in this project will pick up right where it left off. Don't keep going past that point in the same turn.
 
-**Finishing:** once the run reaches a terminal state (`reviewer` reports, or the user abandons it), delete the state file — a stale "paused run found" prompt on the next invocation is worse than no state at all.
+**Finishing:** once the run reaches a terminal state (`reviewer` reports, or the user explicitly abandons it), **archive** the state file rather than deleting it outright — move it to `~/.claude/dev-team-runs/.archive/<project-id>-<UTC timestamp from date -u>.json` (same content, just relocated). This keeps a stale "paused run found" prompt from showing up on the next invocation (the active file is gone from the main directory) while leaving a recovery trail if this call was ever wrong — a run marked finished when it wasn't, or an interrupted session where the file's true state is ambiguous. Never treat "the user seems to have moved on" or "this session is ending" alone as abandonment — abandonment is the user explicitly saying so, or `reviewer` actually reporting.
+- Opportunistically prune the archive when it's convenient (e.g. while already touching this directory at the start of a run): delete archived files older than 7 days. Don't make a special trip to do this — it's just tidiness, not correctness.
+- If the paused-run check (Pipeline step 0) finds nothing active for this project but an archived file exists, mention it in passing ("no active run, though there's an archived one from <date> if you want to look at it") rather than silently saying nothing.
 
 **Flagging heavy context:** after the 2nd loop-back to `project-manager` in a single run (Core rule below), say so explicitly and suggest pausing: "This is the Nth time we've looped back — context is growing. Want to pause here and `/compact` before continuing?" Don't force it — just offer, using the pause flow above if they say yes.
 
@@ -52,11 +58,11 @@ Small, purely mechanical fixes an engineer can resolve within their own step (a 
 
 ## Pipeline
 
-0. **Check for a paused run** (see Run state above) before doing anything else. If one exists for this project, ask the user whether to resume or discard it. Resuming jumps straight to the saved `current` stage; discarding deletes the old state file and proceeds to step 1 as normal.
+0. **Check for a paused run** (see Run state above) before doing anything else. If one exists for this project, ask the user whether to resume or discard it. Resuming jumps straight to the saved `current` stage; discarding archives the old state file (per Finishing, below) and proceeds to step 1 as normal — the user explicitly choosing to discard is exactly the "abandoned" case. If none is active but an archived one exists, mention it briefly.
    - On resume, if a viz URL is configured, give it to the user again in the same "Watch live: <url>" line as step 2 below — don't assume they still have the tab open from before the pause.
 
 1. **Plan — `project-manager`**
-   Summarize the feature request and relevant conversation context (the agent has no memory of this chat) and pass it to the `project-manager` agent. It returns a plan: summary, scope, acceptance criteria, required disciplines (`design`/`frontend`/`backend`, any combination), and open questions.
+   Summarize the feature request and relevant conversation context (the agent has no memory of this chat) and pass it to the `project-manager` agent. It returns a plan: summary, scope, acceptance criteria, required disciplines (`design`/`database`/`frontend`/`backend`/`devops`, any combination), and open questions.
    - If it raises open questions, ask the user before continuing rather than guessing.
 
 2. **User approval gate — required before any implementation**

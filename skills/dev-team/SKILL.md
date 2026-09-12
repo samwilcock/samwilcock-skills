@@ -9,6 +9,19 @@ Orchestrate a fixed pipeline of specialist subagents (defined in this plugin's `
 
 `researcher` is a fast, cheap lookup agent (not a pipeline stage) — `project-manager` can call it directly for quick codebase questions or external tool/method research while planning. You (the orchestrator) may also call it directly if you need a quick answer to route the pipeline correctly.
 
+## Live visualization (optional)
+
+If `~/.claude/dev-team-viz.json` exists and has a `url` field, it points to a published "Pipeline Control Room" Artifact (a live 3D tracker) that this run should update. If the file is missing, skip this entirely — visualization is optional and never blocks the pipeline.
+
+When a viz URL is configured:
+1. At the start of a run, use the Artifact tool (`action: "write_db"`, `db_op: "set"`, that `url`, `collection: "runs"`, `doc_id: "current"`) to write the initial document: `feature`, a generated `runId`, `startedAt` (ISO), `updatedAt`, `current: "plan"`, and a `stages` object with every stage key (`plan`, `approval`, `design`, `tests`, `frontend`, `backend`, `verify`, `review`, `researcher`) set to `{status: "pending"}`.
+2. Immediately before invoking each specialist, `update` that document: set that stage's status to `"running"` and `current` to its key, `updatedAt` to now.
+3. Immediately after a specialist reports back, `update` again: status to `"done"` (or `"blocked"` if it raised an issue per the Core rule, or `"skipped"` for `design`/`frontend`/`backend` when the plan doesn't require that discipline), plus a one-sentence `summary` of what it reported, and `updatedAt`.
+4. On a loop back to `project-manager`, reset the stages being redone to `"pending"` before re-running them.
+5. Use `if_version` (from the last read/write of that document) on every update to avoid clobbering a concurrent write.
+
+Keep this lightweight: one or two short tool calls per stage transition, never more, and never let a failed viz write interrupt or slow down the actual pipeline — catch and ignore errors from it.
+
 ## Core rule: issues always go back to the project manager
 
 Any specialist (designer, test-engineer, frontend-engineer, backend-engineer, tester, reviewer) can surface an issue that isn't a simple "fix this line" bug — a bad assumption in the plan, a missing/wrong acceptance criterion, an untestable requirement, a design that doesn't fit the implementation, a reviewer finding that implies a scope change. Whenever that happens:

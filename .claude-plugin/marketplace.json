@@ -7,7 +7,7 @@
     {
       "name": "dev-team",
       "source": "./",
-      "description": "A specialist dev team (PM on opus, researcher on haiku, designer, test engineer, frontend/backend engineers, tester, reviewer) orchestrated through a TDD workflow via the /dev-team skill, with a user approval gate on the plan and issue loopback to the PM."
+      "description": "A specialist dev team (PM on opus, researcher on haiku, designer, test engineer, frontend/backend engineers, tester, reviewer) orchestrated through a TDD workflow via the /dev-team skill, with a user approval gate on the plan, issue loopback to the PM, and an optional live 3D pipeline visualization."
     }
   ]
 }

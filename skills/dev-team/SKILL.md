@@ -1,6 +1,6 @@
 ---
 name: dev-team
-description: Run a feature request through a specialist dev team using TDD - project manager plans it (with researcher support, approved by the user before anything is built), a designer produces UI design when needed, a test engineer writes failing tests, frontend/backend engineers implement only the disciplines needed (in parallel when both apply), a tester verifies, and a reviewer does final code review. Any issue found along the way loops back to the project manager for re-planning. Use when the user asks to build/implement a feature with the "dev team", or explicitly invokes /dev-team.
+description: Run a feature request through a specialist dev team using TDD - project manager plans it (with researcher support, approved by the user before anything is built), a designer produces UI design when needed, a test engineer writes failing tests, frontend/backend engineers implement only the disciplines needed (in parallel when both apply), a tester verifies, and a reviewer does final code review. Any issue found along the way loops back to the project manager for re-planning. Progress persists to disk so a run can be paused and resumed (e.g. around a /compact) without losing state. Use when the user asks to build/implement a feature with the "dev team", or explicitly invokes /dev-team.
 ---
 
 # Dev Team
@@ -23,6 +23,20 @@ When a viz URL is configured:
 
 Keep this lightweight: one or two short tool calls per stage transition, never more, and never let a failed viz write interrupt or slow down the actual pipeline — catch and ignore errors from it.
 
+## Run state, pausing, and resuming
+
+A long run (several agents, possibly a loop-back or two) can grow your own context enough that a `/compact` becomes worth doing mid-pipeline. Since compaction summarizes the conversation, the pipeline's actual progress needs to live somewhere durable that isn't your context — so every run persists its state to a local file, independent of whether visualization is configured:
+
+`~/.claude/dev-team-runs/<project-id>.json` (same slugging rule as the viz doc id — see above), written directly with the Write/Edit tools (this is local state, not the Artifact tool's db — that's only for the optional viz). Update it at exactly the same moments you'd update the viz doc (run start, before/after each stage, on loop-back), whether or not a viz URL is configured. It holds: `feature`, the full current `plan` text, `approved` (bool), `stages` (status + summary per stage, same shape as the viz doc), `current`, `loopCount` (times sent back to `project-manager`), `createdAt`, `updatedAt`.
+
+**At the start of every `/dev-team` invocation:** check whether this file already exists for the current project. If it does and isn't finished, tell the user a paused run was found (feature + current stage) and ask whether to resume it or discard it and start fresh — don't silently pick one. Resuming means: load the plan (skip re-planning and re-approval if `approved` is already true), skip every stage already `"done"`/`"skipped"`, and continue from `current`.
+
+**Pausing:** if the user asks to pause (or you're about to suggest a `/compact`, see below), finish or abandon the in-flight specialist call cleanly, make sure the state file is fully up to date, then tell them in one line that it's safe to `/compact` or end the session now, and that running `/dev-team` again in this project will pick up right where it left off. Don't keep going past that point in the same turn.
+
+**Finishing:** once the run reaches a terminal state (`reviewer` reports, or the user abandons it), delete the state file — a stale "paused run found" prompt on the next invocation is worse than no state at all.
+
+**Flagging heavy context:** after the 2nd loop-back to `project-manager` in a single run (Core rule below), say so explicitly and suggest pausing: "This is the Nth time we've looped back — context is growing. Want to pause here and `/compact` before continuing?" Don't force it — just offer, using the pause flow above if they say yes.
+
 ## Core rule: issues always go back to the project manager
 
 Any specialist (designer, test-engineer, frontend-engineer, backend-engineer, tester, reviewer) can surface an issue that isn't a simple "fix this line" bug — a bad assumption in the plan, a missing/wrong acceptance criterion, an untestable requirement, a design that doesn't fit the implementation, a reviewer finding that implies a scope change. Whenever that happens:
@@ -35,6 +49,8 @@ Any specialist (designer, test-engineer, frontend-engineer, backend-engineer, te
 Small, purely mechanical fixes an engineer can resolve within their own step (a typo, an off-by-one their own test caught) don't need this — only loop back when the issue implies the plan itself was wrong or incomplete.
 
 ## Pipeline
+
+0. **Check for a paused run** (see Run state above) before doing anything else. If one exists for this project, ask the user whether to resume or discard it. Resuming jumps straight to the saved `current` stage; discarding deletes the old state file and proceeds to step 1 as normal.
 
 1. **Plan — `project-manager`**
    Summarize the feature request and relevant conversation context (the agent has no memory of this chat) and pass it to the `project-manager` agent. It returns a plan: summary, scope, acceptance criteria, required disciplines (`design`/`frontend`/`backend`, any combination), and open questions.

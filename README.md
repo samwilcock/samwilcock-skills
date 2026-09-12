@@ -26,6 +26,10 @@ To enable it:
 
 This is per-user (the artifact's live data is scoped to its owner's organization) and entirely optional — without the config file, `/dev-team` runs exactly as before.
 
+## Pausing and resuming
+
+Every run's progress is saved to `~/.claude/dev-team-runs/<project>.json` as it goes — not just when you ask. On a long run (a couple of loop-backs, say), Claude will offer to pause and suggest a `/compact` once your context is getting heavy; say yes, `/compact`, then run `/dev-team` again in the same project and it'll pick up exactly where it left off — no need to re-approve a plan you already approved or redo finished stages. You can also ask to pause at any point yourself.
+
 ## Install
 
 ```

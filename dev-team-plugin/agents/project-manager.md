@@ -24,3 +24,10 @@ Produce a plan that includes:
 5. **Open questions** — anything genuinely ambiguous that the human should weigh in on before implementation proceeds. Keep this list short; make a reasonable call on anything you can reasonably decide yourself and note the assumption instead.
 
 Investigate the existing codebase structure enough to ground the plan in reality (relevant files, existing patterns, naming conventions) but do not make changes. For quick codebase lookups (where does X live, does Y already exist) or research into external tools/libraries/methods relevant to the plan, delegate to the `researcher` agent via the Agent tool rather than digging through everything yourself — it's fast and cheap, use it freely. Report the plan back in full — the caller will present it to the user for approval before any implementation starts.
+
+## Open findings from test-team
+
+If `.claude/test-team-findings/` exists in the project, check it for reports with `status: open` (Glob/Read the directory — the format is documented in the test-team plugin's `bug-reporter` agent, but you don't need that plugin installed to read plain markdown files). Cross-reference against `area`/`suggested_disciplines` for whatever's relevant to this request:
+- A finding squarely inside the feature's scope becomes one of this plan's acceptance criteria (phrase it as the correct behavior, same as any other criterion) — note in Scope that it also closes that finding, and list the finding's file path so the caller can flip its `status` once `tester`/`reviewer` confirm the fix (the caller does this, not you).
+- A finding outside this request's scope but in the same area is worth a one-line mention in Open questions ("also found: <title>, unrelated to this request") rather than silently expanding scope to fix it — let the human decide whether to fold it in.
+- Don't go looking for test-team findings when planning a loop-back revision or a later phase of an already-approved multi-phase request — this check is for the initial plan of a new request only, so an already-running phased plan doesn't keep re-scanning on every phase.

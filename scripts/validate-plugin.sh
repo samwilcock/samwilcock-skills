@@ -26,15 +26,19 @@ else
     else
       ok "$MARKET_JSON is valid JSON declaring $plugin_count plugin(s)"
     fi
-    while IFS= read -r source; do
+    while IFS=$'\t' read -r source market_name; do
       resolved="${source#./}"
       if [ ! -e "$resolved" ] && [ "$resolved" != "" ]; then
         err "marketplace plugin source \"$source\" does not resolve to an existing path"
-      else
-        ok "marketplace plugin source \"$source\" resolves"
-        plugin_dirs+=("$resolved")
+        continue
       fi
-    done < <(jq -r '.plugins[].source' "$MARKET_JSON")
+      ok "marketplace plugin source \"$source\" resolves"
+      plugin_dirs+=("$resolved")
+      plugin_json_name=$(jq -r '.name // empty' "$resolved/.claude-plugin/plugin.json" 2>/dev/null || true)
+      if [ -n "$plugin_json_name" ] && [ "$plugin_json_name" != "$market_name" ]; then
+        err "marketplace entry name \"$market_name\" does not match $resolved/.claude-plugin/plugin.json's name \"$plugin_json_name\""
+      fi
+    done < <(jq -r '.plugins[] | [.source, .name] | @tsv' "$MARKET_JSON")
   fi
 fi
 
@@ -65,6 +69,7 @@ for dir in "${plugin_dirs[@]}"; do
       base=$(basename "$f" .md)
       name=$(awk '/^name:/{print $2; exit}' "$f")
       desc=$(awk '/^description:/{found=1; sub(/^description: */, ""); print; exit}' "$f")
+      model=$(awk '/^model:/{print $2; exit}' "$f")
 
       if [ "$name" != "$base" ]; then
         err "$f: frontmatter name \"$name\" does not match filename \"$base\""
@@ -75,6 +80,11 @@ for dir in "${plugin_dirs[@]}"; do
       if ! head -1 "$f" | grep -q '^---$'; then
         err "$f: does not start with YAML frontmatter (---)"
       fi
+      case "$model" in
+        sonnet|opus|haiku|fable|inherit|claude-*) ;;
+        "") err "$f: missing model in frontmatter" ;;
+        *) err "$f: unrecognized model \"$model\" (expected an alias like sonnet/opus/haiku/fable, \"inherit\", or a full claude-* model ID)" ;;
+      esac
     done
     ok "checked agent frontmatter in $dir/agents/"
   fi

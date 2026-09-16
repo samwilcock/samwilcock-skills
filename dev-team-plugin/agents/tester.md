@@ -1,6 +1,6 @@
 ---
 name: tester
-description: Runs the full test suite after implementation and analyzes results, distinguishing real regressions/failures from flakes or unrelated pre-existing failures. Use after frontend/backend engineers report their work done.
+description: Runs the full test suite after implementation and analyzes results, distinguishing real regressions/failures from flakes or unrelated pre-existing failures. Use after the required engineers (frontend/backend/database/devops) report their work done.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---

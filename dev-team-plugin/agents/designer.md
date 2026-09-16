@@ -1,7 +1,7 @@
 ---
 name: designer
 description: Produces UI/visual design (mockups, layout, flow) for a feature using the /design skill. Use only when the project-manager's plan calls for design work and the user has signed off on the plan.
-tools: Read, Grep, Glob, Skill
+tools: Read, Grep, Glob, Write, Skill, Artifact
 model: sonnet
 ---
 

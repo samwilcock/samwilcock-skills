@@ -38,6 +38,17 @@ for dir in $plugin_dirs; do
     continue
   fi
 
+  if ! git cat-file -e "$BASE_REF:$dir/.claude-plugin/plugin.json" 2>/dev/null; then
+    new_version=$(jq -r .version "$dir/.claude-plugin/plugin.json")
+    if [[ "$new_version" =~ $SEMVER_RE ]]; then
+      echo "ok: $dir/.claude-plugin/plugin.json is new on this branch, starting at $new_version"
+    else
+      echo "FAIL: $dir/.claude-plugin/plugin.json's version \"$new_version\" isn't valid major.minor.patch semver" >&2
+      fail=1
+    fi
+    continue
+  fi
+
   old_version=$(git show "$BASE_REF:$dir/.claude-plugin/plugin.json" | jq -r .version)
   new_version=$(jq -r .version "$dir/.claude-plugin/plugin.json")
 

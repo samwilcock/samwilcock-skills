@@ -10,6 +10,10 @@ A Claude Code plugin that gives you a specialist testing team:
 
 Test engineers run in parallel where more than one level applies; `bug-reporter` runs last, batching every real finding into one pass so it can deduplicate.
 
+## Test plan template
+
+[`templates/test-plan.md`](templates/test-plan.md) is the standard shape for a manual/scripted test plan — target, preconditions, numbered scenarios (steps, expected result, priority), and out-of-scope notes. Copy it, fill it in, and hand it to `/test-team` to get consistent, structured runs out of `test-plan-runner`. If you don't provide one, `test-plan-runner` derives a plan in this same shape from a feature's acceptance criteria instead.
+
 ## Handoff to dev-team
 
 Bug reports are written to `.claude/test-team-findings/<slug>.md` in the target project — see [`agents/bug-reporter.md`](agents/bug-reporter.md) for the exact format. This is the same format the [dev-team](../dev-team-plugin) plugin's `project-manager` agent can be pointed at to plan fixes from. The two plugins don't call each other automatically — run `/test-team` to find and file bugs, then `/dev-team` to fix them.

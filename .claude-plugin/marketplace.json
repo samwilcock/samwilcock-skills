@@ -1,13 +1,18 @@
 {
-  "name": "dev-team",
+  "name": "samwilcock-skills",
   "owner": {
     "name": "Sam Wilcock"
   },
   "plugins": [
     {
       "name": "dev-team",
-      "source": "./",
+      "source": "./dev-team-plugin",
       "description": "A specialist dev team (PM on opus, researcher on haiku, designer, database engineer, frontend/backend/devops engineers, test engineer, tester, reviewer) orchestrated through a TDD workflow via the /dev-team skill, with a user approval gate on the plan, issue loopback to the PM, an optional live 3D pipeline visualization, and pause/resume support around context compaction."
+    },
+    {
+      "name": "test-team",
+      "source": "./test-team-plugin",
+      "description": "A specialist testing team (unit/integration/e2e test engineers, a test-plan runner, and a bug reporter) that writes and runs tests and reports findings as structured bug reports, via the /test-team skill. Findings are written in a format the dev-team plugin's project-manager can consume directly for a fix loop."
     }
   ]
 }

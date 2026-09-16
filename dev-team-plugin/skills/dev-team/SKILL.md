@@ -88,6 +88,7 @@ Small, purely mechanical fixes an engineer can resolve within their own step (a 
 
 6. **Implement — `frontend-engineer` / `backend-engineer` / `devops-engineer`**
    Invoke only the engineer(s) the failing tests actually require. Their work is normally separable, so invoke however many of the three are required **in parallel**, in a single message (one Agent tool call per engineer, together) — each should get the plan (plus designer notes and the database contract, if any) and only the tests/criteria relevant to their discipline. If only one discipline is required, invoke only that one.
+   - **Batch large discipline workloads.** If a single engineer's assigned tests/criteria for this run number more than roughly 6-8, don't hand them all to one call — split them into smaller batches (grouped by natural sub-feature or file area, not arbitrarily) and invoke that engineer once per batch, sequentially, checking its report before starting the next batch. This keeps any one agent invocation bounded instead of open-ended, which is what actually controls session length and usage — see "Keeping engineer runs short" below.
    - If `design` ran, `frontend-engineer` must get the design artifact's URL and the designer's full notes (key screens/states/components, interaction notes) verbatim — this is required build spec, not a summarizable status update. The "Reporting back" section's terseness rules apply to what you tell the *user*, never to what you hand an engineer.
    - If multiple engineers reported touching shared/overlapping code, check for conflicts (e.g. re-read the touched files) before moving on.
 
@@ -107,6 +108,15 @@ Concise throughout — this pipeline runs several agents per feature, so verbosi
 - Never paste an agent's full report verbatim **to the user**. Extract the one or two facts that change what happens next (status, what changed, the number that matters) and drop the rest — the ledger/viz artifact (if configured) already carries the detail. This applies only to what you tell the user, not to what you hand the next agent — an engineer needing another agent's full output (e.g. `frontend-engineer` needing `designer`'s complete notes, per step 6 above) still gets it in full.
 - The plan (step 2) is the one exception — present it in full since the user is approving it.
 - At the end: 2-4 lines total — what was built, test result, reviewer verdict (or "clean"). If it stopped early, say why and what's needed, in one line.
+
+## Keeping engineer runs short
+
+A single engineer call that's handed an unbounded pile of work can run for hours and burn a lot of usage before it ever reports back — and if it goes wrong, all of that is wasted at once. Keep each call small on purpose:
+
+- Apply the batching rule in step 6 above by default, not just when a run is visibly dragging on — decide the batch split *before* invoking the engineer, based on the test/criteria count, not after noticing a call is taking a long time.
+- A reasonable batch is one that an engineer could plausibly finish, verify, and report on in a single focused pass — a handful of related tests or one coherent sub-feature, not "everything the discipline needs."
+- Between batches, treat each report as a real checkpoint: if it flags an issue (shared-code conflict, a wrong assumption), resolve or route it (Core rule) before starting the next batch rather than letting it ride.
+- This is a cost/reliability control, not a correctness one — don't split a batch so finely that it breaks logically related changes across calls (e.g. a type and its only usage). Use judgment on what's genuinely separable.
 
 ## Reducing token usage
 

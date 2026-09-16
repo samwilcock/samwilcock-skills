@@ -1,7 +1,7 @@
 {
   "name": "dev-team",
-  "version": "1.0.0",
-  "description": "A specialist dev team (PM on opus, researcher on haiku, designer, database engineer, frontend/backend/devops engineers, test engineer, tester, reviewer) orchestrated through a TDD workflow via the /dev-team skill, with a user approval gate on the plan, issue loopback to the PM, an optional live 3D pipeline visualization, and pause/resume support around context compaction.",
+  "version": "2.0.0",
+  "description": "Builds features with TDD: a light mode (default) where the session plans and implements itself, and a full mode that runs specialist database/frontend/backend/devops engineers in parallel for well-specified multi-discipline work. User-approved plans, a shared context brief so agents don't re-explore the codebase, one reviewer that verifies and reviews each phase, phased delivery for large requests, and resumable paused runs.",
   "author": {
     "name": "Sam Wilcock"
   }

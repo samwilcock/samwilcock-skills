@@ -1,7 +1,7 @@
 {
   "name": "test-team",
-  "version": "1.0.0",
-  "description": "A specialist testing team (unit/integration/e2e test engineers, a test-plan runner, and a bug reporter) that writes and runs tests and reports findings as structured bug reports, via the /test-team skill. Findings are written in a format the dev-team plugin's project-manager can consume directly for a fix loop.",
+  "version": "1.0.1",
+  "description": "A specialist testing team (unit/integration/e2e test engineers, a test-plan runner, and a bug reporter) that writes and runs tests and reports findings as structured bug reports, via the /test-team skill. The dev-team plugin reads open findings when planning, so they can be fixed in a follow-up run.",
   "author": {
     "name": "Sam Wilcock"
   }

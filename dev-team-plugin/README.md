@@ -1,35 +1,37 @@
 # dev-team
 
-A Claude Code plugin that gives you a specialist dev team, orchestrated via TDD:
+A Claude Code plugin that builds features with TDD. You approve a plan before anything is built, and one independent reviewer verifies and reviews each phase.
 
-1. **project-manager** (opus) — plans the feature from your request/chat; **you approve the plan before anything is built**. Can delegate quick lookups to `researcher` while planning.
-2. **researcher** (haiku) — fast, cheap codebase lookups and external tool/method research; not a pipeline stage, called on demand
-3. **designer** — (only if the plan calls for it) produces UI design via the `/design` skill
-4. **test-engineer** — writes failing tests against the plan's acceptance criteria
-5. **database-engineer** — (only if the plan calls for it) schema/migrations, run before the engineers below since they typically build against it
-6. **frontend-engineer** / **backend-engineer** / **devops-engineer** — implement only the disciplines the tests require (run in parallel with each other when more than one is needed)
-7. **tester** — independently verifies everything passes
-8. **reviewer** — final code review
+## Two modes
 
-Any specialist that hits an issue implying the plan itself was wrong (not just a code bug) sends it back to the project manager, who revises the plan — you approve the revision before the pipeline continues.
+**Light (default)** — the current session plans, writes a short context brief, and implements with TDD itself. Subagents are used only where they add something:
+- **researcher** (Haiku) — cheap codebase lookups and external research
+- **designer** — UI design via the `/design` skill, when the plan needs it
+- **reviewer** — one independent pass per phase: runs the full suite, checks every criterion is tested, reviews the diff
 
-## Live visualization (optional)
+**Full** — for well-specified work that needs two or more of database/frontend/backend/devops with changes that are mostly in separate files. It adds:
+- **project-manager** (Sonnet; Opus if you ask) — plans the work and writes the context brief
+- **database-engineer** — schema and migrations, run before the other engineers
+- **frontend-engineer** / **backend-engineer** / **devops-engineer** — each writes its own failing tests, then the code, for one sub-feature at a time, running in parallel with each other
 
-A published Artifact — **Pipeline Control Room** — renders the pipeline as a house being built: each stage is a room that rises from a blueprint footprint to full walls and a roof as it completes. It opens on a dashboard — a card per project currently running `/dev-team`, showing what it's building, its progress at a glance, and when it last updated — click a card to enter that project's live floorplan and stage ledger, with a rail at the top to jump straight to another project without going back.
+The mode is picked automatically and stated with the plan. Say "light" or "full" in your request to force one, or switch at the approval step.
 
-To enable it:
-1. Publish your own copy of the Pipeline Control Room artifact — the source lives at [`viz/pipeline-control-room.html`](viz/pipeline-control-room.html) in this repo — with the `db` capability (ask Claude to publish it for you).
-2. Save its URL to `~/.claude/dev-team-viz.json`:
-   ```json
-   { "url": "https://claude.ai/code/artifact/<your-artifact-id>" }
-   ```
-3. Run `/dev-team` as normal — the skill writes stage status to that artifact's shared data as it goes. Open the artifact URL to watch live.
+Exploratory or tightly coupled work — reworking editor interactions, a tricky refactor, anything you'd figure out by iterating — is much cheaper in light mode. Every subagent starts cold and has to re-read the code it works on.
 
-This is per-user (the artifact's live data is scoped to its owner's organization) and entirely optional — without the config file, `/dev-team` runs exactly as before.
+## How cost is kept down
+
+- **Context brief** — `.claude/dev-team/context.md` maps the relevant files, conventions, the test command, and key contracts. Every agent reads it instead of re-exploring the codebase. Deviations and discoveries get appended as work goes on, so it doesn't go stale.
+- **Fewer handoffs** — engineers write their own tests, and a single reviewer does both verification and review.
+- **Batches are sub-features** — engineers run one coherent sub-feature per call, not arbitrary small chunks.
+- **Phases for large requests** — each phase ships an increment and is a natural point to pause and `/compact`.
 
 ## Pausing and resuming
 
-Every run's progress is saved to `~/.claude/dev-team-runs/<project>.json` as it goes — not just when you ask. On a long run (a couple of loop-backs, say), Claude will offer to pause and suggest a `/compact` once your context is getting heavy; say yes, `/compact`, then run `/dev-team` again in the same project and it'll pick up exactly where it left off — no need to re-approve a plan you already approved or redo finished stages. You can also ask to pause at any point yourself.
+When a run stops before finishing — waiting on your approval, you ask to pause, or before a suggested `/compact` — it saves `.claude/dev-team/run.md` in the project. Run `/dev-team` again later and it offers to pick the run up where it stopped. The file is only written when the run stops, so if a session dies mid-step it resumes from the last stop. Finished runs clean up after themselves.
+
+Add `.claude/dev-team/` to your project's `.gitignore`; these are local working files.
+
+Paused runs from versions before 2.0.0 (saved under `~/.claude/dev-team-runs/`) can't be resumed as-is. `/dev-team` re-plans them from their saved request and plan, then archives the old file.
 
 ## Install
 
@@ -46,11 +48,15 @@ In any project:
 /dev-team Add a "forgot password" flow to the login page
 ```
 
-The skill will call each specialist agent in turn, asking you only when it hits a genuine open question.
-
 ## Updating
 
 ```
 /plugin marketplace update samwilcock-skills
 /plugin update dev-team
 ```
+
+## Upgrading to 2.0.0
+
+- `test-engineer` and `tester` are gone: engineers write their own tests, and `reviewer` verifies.
+- The live pipeline visualization is removed. You can delete `~/.claude/dev-team-viz.json` and the published Pipeline Control Room artifact if you set them up.
+- Run state moved from `~/.claude/dev-team-runs/<project>.json` to `.claude/dev-team/run.md` in each project.

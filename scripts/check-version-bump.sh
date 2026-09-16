@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # For every plugin declared in .claude-plugin/marketplace.json, fails if that
-# plugin's agents/, skills/, viz/, or .claude-plugin/ changed relative to
-# $BASE_REF without a version bump in its plugin.json, or if the new version
+# plugin's agents/, skills/, viz/, templates/, or .claude-plugin/ changed
+# relative to $BASE_REF without a version bump in its plugin.json, or if the new version
 # isn't a valid single-step semver bump (major.minor.patch) over the old one.
 # Keeps installed copies of a plugin from silently going stale, and keeps
 # version numbers meaningful rather than arbitrary.
@@ -24,7 +24,7 @@ plugin_dirs=$(jq -r '.plugins[].source' .claude-plugin/marketplace.json | sed 's
 for dir in $plugin_dirs; do
   echo "-- checking plugin: $dir --"
 
-  changed=$(git diff --name-only "$BASE_REF"...HEAD -- "$dir/agents/" "$dir/skills/" "$dir/viz/" "$dir/.claude-plugin/" || true)
+  changed=$(git diff --name-only "$BASE_REF"...HEAD -- "$dir/agents/" "$dir/skills/" "$dir/viz/" "$dir/templates/" "$dir/.claude-plugin/" || true)
   if [ -z "$changed" ]; then
     echo "ok: no agent/skill/viz/manifest changes in $dir, no version bump required"
     continue

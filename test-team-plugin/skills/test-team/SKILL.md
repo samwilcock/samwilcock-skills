@@ -13,6 +13,7 @@ Before dispatching agents, work out from the user's request:
 - **Target**: a feature, module, flow, or "the whole app" — whatever was named or is clearly implied by conversation context.
 - **Which test levels apply**: unit, integration, e2e, or a specific test plan — default to unit + integration for a code-level target, add e2e when the target is a user-facing flow, and use only test-plan-runner when the user hands you an explicit plan to execute rather than asking for new tests.
 - If genuinely ambiguous (e.g. "test the app" with no other context, in a large codebase), ask the user to scope it rather than guessing at the whole surface area.
+- If the user hasn't provided a test plan but the run will include `test-plan-runner`, you can point them at this plugin's `templates/test-plan.md` for the standard shape (target, preconditions, numbered scenarios with steps/expected result/priority) — worth mentioning once, not forcing; `test-plan-runner` derives one in that same shape if none is given.
 
 ## Pipeline
 

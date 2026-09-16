@@ -1,6 +1,6 @@
 ---
 name: bug-reporter
-description: Turns raw test failures/findings (from any test engineer or the test-plan-runner) into structured bug report files that the dev-team plugin's project-manager can consume directly. Use as the last step whenever testing surfaced one or more real failures.
+description: Turns raw test failures/findings (from any test engineer or the test-plan-runner) into structured bug report files that the dev-team plugin reads when planning fixes. Use as the last step whenever testing surfaced one or more real failures.
 tools: Read, Grep, Glob, Bash, Write, Edit
 model: sonnet
 ---
@@ -52,5 +52,5 @@ Rules:
 2. `suggested_disciplines` should be a real guess (helps the dev team route it) — infer from the area affected, don't leave it empty.
 3. Never guess at root cause you haven't actually verified — if you're not sure why something fails, say what you observed and leave cause investigation to the engineer who picks it up.
 4. If a similar report already exists in `.claude/test-team-findings/` for the same underlying bug, update/append to it rather than creating a duplicate — check before writing.
-5. `status` is always `open` on a report you write — never `fixed` or `verified`, even if the underlying failure happens to look resolved by the time you write it up. Only whoever re-runs the fix (dev-team's tester/reviewer, or a later test-team pass re-testing the same area) has grounds to change status; you only ever see the failure.
+5. `status` is always `open` on a report you write — never `fixed` or `verified`, even if the underlying failure happens to look resolved by the time you write it up. Only whoever re-runs the fix (dev-team after its reviewer passes the fix, or a later test-team pass re-testing the same area) has grounds to change status; you only ever see the failure.
 6. After writing, report back: list of files written/updated, one-line summary of each, and overall severity breakdown.

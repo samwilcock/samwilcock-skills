@@ -1,159 +1,130 @@
 ---
 name: dev-team
-description: Run a feature request through a specialist dev team using TDD - project manager plans it (with researcher support, approved by the user before anything is built), a designer produces UI design when needed, a test engineer writes failing tests, a database engineer builds schema/migrations when needed, frontend/backend/devops engineers implement only the disciplines needed (in parallel where possible), a tester verifies, and a reviewer does final code review. Any issue found along the way loops back to the project manager for re-planning. Progress persists to disk so a run can be paused and resumed (e.g. around a /compact) without losing state. Use when the user asks to build/implement a feature with the "dev team", or explicitly invokes /dev-team.
+description: Build a feature with TDD, either in this session (light mode, the default) or through a pipeline of specialist subagents (full mode, for well-specified work spanning several separable disciplines). Plans are approved by the user before anything is built, a shared context brief stops agents re-exploring the codebase, one reviewer verifies and reviews each phase, and a run file lets a paused run be picked up in a later session. Use when the user asks to build/implement a feature with the "dev team", or explicitly invokes /dev-team.
 ---
 
 # Dev Team
 
-Orchestrate a fixed pipeline of specialist subagents (defined in this plugin's `agents/` directory) to take a feature request from discussion to reviewed, tested code using TDD. You are the orchestrator: call each agent via the Agent tool, pass along what it needs, and use its report to decide what happens next. Do not do the specialists' work yourself — delegate it, and keep the user informed with brief status updates between stages.
+You run a feature request from discussion to tested, reviewed code using TDD. Most of the cost of multi-agent work is agents starting cold and re-reading the same code, so this skill only uses subagents where they genuinely pay for themselves.
 
-`researcher` is a fast, cheap lookup agent (not a pipeline stage) — `project-manager` can call it directly for quick codebase questions or external tool/method research while planning. You (the orchestrator) may also call it directly if you need a quick answer to route the pipeline correctly.
+## Working files
 
-## Live visualization (optional)
+Both live in the target project under `.claude/dev-team/`. They're local working files — don't stage them in commits, and if the project's `.gitignore` doesn't cover `.claude/dev-team/`, mention that to the user once.
 
-If `~/.claude/dev-team-viz.json` exists and has a `url` field, it points to a published "Pipeline Control Room" Artifact — a live 3D dashboard that tracks every project currently running `/dev-team` at once, each in its own lane. If the file is missing, skip this entirely — visualization is optional and never blocks the pipeline.
+- **`context.md` — the context brief.** Written by whoever plans (you in light mode, `project-manager` in full mode), in the format described in `${CLAUDE_PLUGIN_ROOT}/agents/project-manager.md`. It's the shared map of the relevant code: files and their roles, conventions, the test command, key contracts, gotchas, and a "Decisions & deviations" section. Every agent reads it first and only explores beyond it for what it doesn't cover. After planning, **you are its only writer**: when a report mentions a deviation, an assumption, or something important the agent had to discover, append one line to it. That keeps later batches, the reviewer, the next phase, and a resumed session working from what's actually true.
+- **`run.md` — the run file.** Holds what's needed to pick up a paused run (see Stopping and resuming). It's written only when the run stops, not after every step.
 
-**Timestamps must be real.** Every `startedAt`/`updatedAt` you write (viz doc and the local run-state file below) is the actual current UTC time — get it with `date -u +%Y-%m-%dT%H:%M:%SZ` (Bash) at the moment of the write, never a placeholder, a guess, or a value reused from an earlier stage. The viz artifact renders these in the viewer's own local timezone automatically — that only works if the stored value is genuinely correct UTC.
+## Modes
 
-When a viz URL is configured:
-1. Compute a project doc id from the current working directory: take its basename, lowercase it, replace any character outside `a-z0-9-` with `-`, and collapse repeats (e.g. `/Users/sam/Dev/checkout-flow` → `checkout-flow`). This keeps concurrent runs in different projects from colliding — each writes to `runs/<that id>`, never `runs/current`.
-2. At the start of a run, use the Artifact tool (`action: "write_db"`, `db_op: "set"`, that `url`, `collection: "runs"`, `doc_id: "<project id>"`) to write the initial document: `projectName` (the same basename, unslugified), `feature`, a generated `runId`, `startedAt` (ISO), `updatedAt`, `current: "plan"`, and a `stages` object with every stage key (`plan`, `approval`, `design`, `tests`, `database`, `frontend`, `backend`, `devops`, `verify`, `review`, `researcher`) set to `{status: "pending"}`.
-3. Immediately before invoking each specialist, `update` that document: set that stage's status to `"running"` and `current` to its key, `updatedAt` to now.
-4. Immediately after a specialist reports back, `update` again: status to `"done"` (or `"blocked"` if it raised an issue per the Core rule, or `"skipped"` for `design`/`database`/`frontend`/`backend`/`devops` when the plan doesn't require that discipline), plus a one-sentence `summary` of what it reported, and `updatedAt`.
-5. On a loop back to `project-manager`, reset the stages being redone to `"pending"` before re-running them.
-6. Use `if_version` (from the last read/write of that document) on every update to avoid clobbering a concurrent write — this matters more now that multiple runs may write to the same artifact's database (different docs, but still worth pinning).
+**Light (default).** You plan, write the brief, and implement everything yourself with TDD in this session. Your understanding of the code accumulates in one context instead of being rebuilt by each agent. Subagents are used only where they add something you can't: `researcher` for cheap lookups or external research, `designer` when the plan needs a visual design, and `reviewer` once per phase for an independent verify and review.
 
-Keep this lightweight: one or two short tool calls per stage transition, never more, and never let a failed viz write block or slow down the actual pipeline — but don't swallow the failure silently either. The **first** time a viz write fails in a run, tell the user in one line ("live viz isn't syncing — continuing without it") and keep going; don't mention it again for the rest of that run, and don't retry. The local run-state file (see below) is unaffected either way — it's written directly, not through the viz path, so pipeline progress is never at risk even when viz is broken.
+**Full.** `project-manager` plans and writes the brief, and specialist engineers implement in parallel. Use it only when both are true:
+- the work needs two or more of `database`/`frontend`/`backend`/`devops`, with changes that are mostly in different files, so parallel engineers genuinely save time, and
+- the request is well specified, so the plan can be written up front rather than discovered by iterating.
 
-**Announcing the URL and keeping writes going are standalone rules, not tied to any one pipeline step:**
-- The **first time** you're about to invoke a specialist in a given session — whether that's the normal flow (right after the plan is approved, step 2) or a resumed run jumping straight into a later stage (step 0) — say "Watch live: `<url>`" once, in that same turn, before or alongside your first status update. Don't gate this on which step got you there; check it independently every time a run is about to start doing work.
-- The **per-stage `update` calls** (steps 3–4 above) apply on every stage transition, full stop, regardless of whether the pipeline reached that stage by normal step-by-step progression or by jumping in via resume. A resumed run picking up at `verify` still writes `verify`'s `"running"`/`"done"` updates exactly as a fresh run would — resuming changes where you start, not whether you keep writing.
+Exploratory, tightly coupled, or single-discipline work (e.g. reworking editor interactions, a tricky refactor) stays in light mode.
 
-## Run state, pausing, and resuming
-
-A long run (several agents, possibly a loop-back or two) can grow your own context enough that a `/compact` becomes worth doing mid-pipeline. Since compaction summarizes the conversation, the pipeline's actual progress needs to live somewhere durable that isn't your context — so every run persists its state to a local file, independent of whether visualization is configured:
-
-`~/.claude/dev-team-runs/<project-id>.json` (same slugging rule as the viz doc id — see above), written directly with the Write/Edit tools (this is local state, not the Artifact tool's db — that's only for the optional viz). Update it at exactly the same moments you'd update the viz doc (run start, before/after each stage, on loop-back), whether or not a viz URL is configured — including a fresh real `date -u` timestamp each time (see above). It holds: `schemaVersion` (currently `2` — see "Stale schema" below), `feature`, the full current `plan` text, `approved` (bool), `stages` (status + summary per stage, same shape as the viz doc — an engineer stage's entry also carries `totalBatches`/`completedBatches` while `frontend`/`backend`/`devops` are in progress, see step 6), `current`, `phases` and `phaseIndex` (see Phased runs, below), `loopCount` (times sent back to `project-manager`), `agentCallCount` and `lastContextFlagAt` (see Flagging heavy context, below), `amendments` (see below), `createdAt`, `updatedAt`.
-
-**`current` is always one of the fixed stage keys** — `plan`, `approval`, `design`, `tests`, `database`, `frontend`, `backend`, `devops`, `verify`, `review`, or `researcher`. Never invent a pseudo-stage name for a loop-back or a scoped fix (e.g. don't write `current: "backend-contract-patch"`) — resume matches `current` against this fixed list, and an unrecognized value breaks it silently. If a `project-manager` revision only requires redoing part of one stage, that's still just that stage: reset it to `"pending"` and put whatever extra detail the redo needs (what changed, why, what to fix) in that stage's own `note` field, not in `current` or a new top-level field.
-
-**Phased runs.** A run is always a list of phases, even when there's only one:
-- `phases` is an array of `{name, goal, status, summary}` (`status`: `pending` / `running` / `done`), written once the user approves the phase breakdown (step 2). A request that isn't split gets a single entry. `phaseIndex` is the 0-based index of the phase in progress.
-- `plan`, `approved`, `stages`, and `current` always describe the **current phase only**. They are not a history of earlier phases — that lives in `phases[].summary` and `amendments`.
-- **Moving to the next phase** happens when `reviewer` finishes a phase that isn't the last one (step 8). It is not the end of the run. Mark `phases[phaseIndex]` `done` with a one-line summary, increment `phaseIndex`, set that phase to `running`, reset every entry in `stages` to `{status: "pending"}`, set `current: "plan"` and `approved: false`, clear `plan`, and go back to step 1 for the new phase (passing along the earlier phases' summaries and all `amendments`). If viz is configured, apply the same reset to the viz doc and set its `feature` to `"<feature> (phase N/M: <name>)"`.
-
-**At the start of every `/dev-team` invocation:** check whether this file already exists for the current project. If it does and isn't finished, tell the user a paused run was found (feature, phase N of M if there's more than one, and current stage) and ask whether to resume it or discard it and start fresh — don't silently pick one. Resuming means: load the plan (skip re-planning and re-approval if `approved` is already true), skip every stage already `"done"`/`"skipped"`, and continue from `current`.
-
-**Stale schema — re-plan, don't blindly resume.** If the found state file has no `schemaVersion` field, or one below the current `2` (i.e. it predates lockstep batching, phased runs, and batch-progress tracking), don't resume it mid-pipeline as-is — a stage that finished under the old pipeline never went through batching, and a stage that's `pending`/`running` has no batch-progress fields to pick up correctly. Instead: tell the user in one line that this run predates the batching improvements and you're re-planning it to pick them up (not discarding it — the original feature/plan is preserved as input), then feed its saved `feature` and `plan` text to `project-manager` as a fresh planning pass over the same request (frame it exactly that way: "same scope, re-plan for the current pipeline," not an issue-driven revision, so it doesn't invent new scope unless something in the old plan genuinely looks wrong). Run the normal approval gate on the result before continuing — the plan may come back unchanged, but the user still approves it, same as any new plan. Reset `stages` to `pending` and start implementation from step 4 (`test-engineer`) under the new pipeline; keep `phases`/`amendments` history from the old file if present rather than dropping it. Write `schemaVersion: 2` immediately once you touch the file this way.
-- If the stage named by `current` has status `"running"`, the previous session was interrupted mid-call — no result was ever recorded, so treat it as **not started**: re-invoke that specialist from scratch (with that stage's `note`, if any) rather than assuming partial progress.
-- If `current` doesn't match one of the fixed stage keys (an older or corrupted state file), don't restart the whole pipeline — fall back to the earliest stage, in pipeline order, whose status isn't `"done"`/`"skipped"`, and resume there.
-
-**Pausing:** if the user asks to pause (or you're about to suggest a `/compact`, see below), finish or abandon the in-flight specialist call cleanly, make sure the state file is fully up to date, then tell them in one line that it's safe to `/compact` or end the session now, and that running `/dev-team` again in this project will pick up right where it left off. Don't keep going past that point in the same turn.
-
-**Finishing:** once the run reaches a terminal state (`reviewer` reports on the **last** phase, or the user explicitly abandons the run), **archive** the state file rather than deleting it outright — move it to `~/.claude/dev-team-runs/.archive/<project-id>-<UTC timestamp from date -u>.json` (same content, just relocated). This keeps a stale "paused run found" prompt from showing up on the next invocation (the active file is gone from the main directory) while leaving a recovery trail if this call was ever wrong — a run marked finished when it wasn't, or an interrupted session where the file's true state is ambiguous. Never treat "the user seems to have moved on" or "this session is ending" alone as abandonment — abandonment is the user explicitly saying so. Finishing means `reviewer` actually reporting on the final phase. A `reviewer` report on any earlier phase moves the run to the next phase (see Phased runs) and never archives it.
-- Opportunistically prune the archive when it's convenient (e.g. while already touching this directory at the start of a run): delete archived files older than 7 days. Don't make a special trip to do this — it's just tidiness, not correctness.
-- If the paused-run check (Pipeline step 0) finds nothing active for this project but an archived file exists, mention it in passing ("no active run, though there's an archived one from <date> if you want to look at it") rather than silently saying nothing.
-
-**Flagging heavy context:** don't wait for trouble to check this — a long run can grow your context just from many clean stages/batches in a row, not only from loop-backs. Track `agentCallCount` in the run-state file: increment it on every specialist dispatch (each engineer batch counts separately). Check whether to offer a pause (same flow as above) whenever **either**:
-- it's been 8 or more calls since the last time you offered (track that as `lastContextFlagAt`), or
-- this is the 2nd (or later) loop-back to `project-manager` in this run (Core rule below).
-
-**Only actually make the offer at a round/stage boundary** — right after an engineer round (step 6) or a stage finishes, never in the middle of a discipline's batches. This is a check, not an interrupt: if the trigger condition is met mid-discipline, hold the offer until the current stage's rounds are all done, then ask before moving to the next stage or phase. This keeps it from contradicting "batching doesn't mean stopping early" above — the pipeline still drives a discipline's work to completion in one uninterrupted stretch; the pause is offered between stretches, not inside one.
-
-Say specifically why: "We've run N agent calls / looped back twice — context is growing. Want to pause here and `/compact` before continuing?" Don't force it — just offer, once per trigger, and update `lastContextFlagAt` to the current `agentCallCount` regardless of their answer so a "no" doesn't cause you to ask again next call.
-
-**Keeping the plan current — don't let it go stale.** A saved plan that quietly drifts from what's actually true in the codebase is the same failure as a stale phase in plan mode: later stages, a resumed session, or a next phase's planning all end up working from a description of the feature that's no longer accurate. The `plan` field only gets rewritten on a full `project-manager` revision (Core rule) — but most specialists report smaller "assumptions or deviations from the plan" in their normal report that never rises to a full issue. Don't let those evaporate:
-- Every time a specialist's report includes an assumption or deviation (engineers are explicitly asked to call these out), append a short entry to the run-state file's `amendments` array: `{stage, note, updatedAt}`. This is a log, not a rewrite — don't touch the `plan` text itself for these; that stays project-manager's to revise.
-- Before starting a new phase's plan (multi-phase request) or handing a loop-back issue to `project-manager`, include the accumulated `amendments` alongside the original plan — `project-manager` should be planning against what was actually built, not just what was originally proposed.
-- On resume (step 0), if `amendments` is non-empty, mention that briefly alongside the paused-run summary ("plus N notes from along the way") so the user isn't surprised later that small deviations happened without a re-approval.
-- This is deliberately lightweight — a one-line note per deviation, not a discussion. If a deviation is significant enough that the plan's acceptance criteria or scope are actually wrong, that's still a Core-rule issue, not an amendment; amendments are for things worth remembering, not things that need a decision.
-
-## Core rule: issues always go back to the project manager
-
-Any specialist (designer, test-engineer, database-engineer, frontend-engineer, backend-engineer, devops-engineer, tester, reviewer) can surface an issue that isn't a simple "fix this line" bug — a bad assumption in the plan, a missing/wrong acceptance criterion, an untestable requirement, a design that doesn't fit the implementation, a reviewer finding that implies a scope change. Whenever that happens:
-
-1. Do not try to resolve it yourself or route it straight back to the engineer who hit it.
-2. Send it to `project-manager` with: the original plan, which stage found the issue, and the issue itself.
-3. `project-manager` returns a revised plan.
-4. Present the revision to the user for approval (see gate below) before re-entering the pipeline at whatever stage the revised plan requires (may need to redo design, tests, or implementation — use judgment on how far back to rewind; don't redo stages the revision didn't affect).
-
-Small, purely mechanical fixes an engineer can resolve within their own step (a typo, an off-by-one their own test caught) don't need this — only loop back when the issue implies the plan itself was wrong or incomplete.
+Pick the mode at step 1 from the request plus a quick look at the repo layout — don't read implementation code just to decide. State the mode and a one-line reason when you present the plan. The user can force a mode by saying "light" or "full" in the request, or switch at the approval gate.
 
 ## Pipeline
 
-0. **Check for a paused run** (see Run state above) before doing anything else. If one exists for this project, check its `schemaVersion` first (see "Stale schema" above) — a stale one gets re-planned automatically, not offered as a resume/discard choice. Otherwise ask the user whether to resume or discard it. Resuming jumps straight to the saved `current` stage; discarding archives the old state file (per Finishing, below) and proceeds to step 1 as normal — the user explicitly choosing to discard is exactly the "abandoned" case. If none is active but an archived one exists, mention it briefly.
-   - Resuming (including the stale-schema re-plan) counts as "about to start work" — see the standalone URL-announcement rule in Live visualization above. Don't assume the user still has last session's tab open.
+0. **Check for a run to pick up** (see Stopping and resuming) before anything else.
 
-1. **Plan — `project-manager`**
-   Summarize the feature request and relevant conversation context (the agent has no memory of this chat) and pass it to the `project-manager` agent. It returns a plan: summary, scope, acceptance criteria, required disciplines (`design`/`database`/`frontend`/`backend`/`devops`, any combination), and open questions.
-   - If it raises open questions, ask the user before continuing rather than guessing.
-   - If it proposes splitting the request into separate phases (see `project-manager`'s guidance on large requests), treat each phase as its own plan through steps 1-8, in order, toward the overall goal the user asked for.
-   - If this is the start of a new phase (including phase 1 of a fresh run), and the project is a git repo (`git rev-parse --is-inside-work-tree`), record `phases[phaseIndex].startCommit` (`git rev-parse HEAD`) in the run-state file before any implementation begins. `reviewer` (step 8) diffs from this commit, not an ambiguous "current changes" — this keeps its review scoped to this phase's work even if the working tree already had unrelated changes when the run started.
+1. **Scope.** Summarize the request, choose the mode, and record the phase's starting commit (`git rev-parse HEAD`, if `git rev-parse --is-inside-work-tree` succeeds). If the project isn't a git repo, note that the reviewer will have to review the working tree without a baseline.
 
-2. **User approval gate — required before any implementation**
-   Present the full plan to the user (summary, scope, acceptance criteria, disciplines required) and ask them to accept it, request changes, or reject it. Do not proceed past this point without explicit approval.
-   - If they request changes, send that feedback to `project-manager` as a revision (see Core rule above) and re-present the revised plan. Repeat until approved.
-   - Only once approved does the plan's `design` flag get acted on and implementation begin.
-   - Approval counts as "about to start work" — see the standalone URL-announcement rule in Live visualization above.
-   - For a phased request, get the user's approval on the phase breakdown itself once, up front, alongside the first phase's plan, then write it to the run-state file's `phases` (see Phased runs). After that, each subsequent phase still needs its own plan approved (its acceptance criteria are new), but drive straight from one phase's completion into planning the next rather than stopping to ask whether to continue — the user already agreed to the whole arc. Stop and check in only for a Core-rule issue, a phase's plan raising new open questions, or the user explicitly pausing.
+2. **Plan and brief.**
+   - *Light:* read `${CLAUDE_PLUGIN_ROOT}/agents/project-manager.md` for the plan and brief formats and the test-team findings check, explore the code you'll need to change, and write the plan and `context.md` yourself.
+   - *Full:* invoke `project-manager` with the summarized request and anything you already learned while scoping. It runs on Sonnet; pass `model: "opus"` only if the user asked for Opus planning. It returns the plan and writes `context.md`.
+   - For a large request, the plan splits into phases (see Phases). Ask the user about any open questions before continuing.
 
-3. **Design — `designer`** *(only if the approved plan requires `design`)*
-   Pass the approved plan to `designer`. It uses the `design` skill to produce the design artifact and reports back key screens/states/components and implementation notes for the frontend engineer.
-   - If it reports an issue with the plan (e.g. the request doesn't actually resolve into a coherent design), send it back to `project-manager` per the Core rule, then re-run the approval gate on any revision before continuing.
+3. **Approval gate.** Present the full plan: summary, scope, acceptance criteria, disciplines, mode, and phases if any. Don't implement anything until the user approves it. On requested changes, revise (full mode: send the feedback and the prior plan to `project-manager`) and present it again.
 
-4. **Write failing tests — `test-engineer`**
-   Pass the plan (and the designer's notes, if any) to `test-engineer`. It writes tests against the acceptance criteria and confirms they fail for the right reason. It reports which disciplines each failing test implies — use this, not just the plan's stated disciplines, to decide which engineers to invoke next.
-   - If the plan's acceptance-criteria list is large (roughly 6-8+), apply the same batching rule used for engineers in step 6: split the criteria into batches and invoke `test-engineer` once per batch, sequentially. Grouping the criteria into batches here (rather than reinventing the split in step 6) also gives you a ready-made batch plan to reuse for the engineers' lockstep rounds later.
+4. **Design** *(only if the plan requires `design`)*. Invoke `designer` with the approved plan. Its artifact URL and full notes are build spec: in light mode read the artifact yourself, and in full mode pass both verbatim to `frontend-engineer`.
 
-5. **Database — `database-engineer`** *(only if the approved plan requires `database`)*
-   Pass the plan and the relevant failing tests to `database-engineer`. It designs and applies the schema/migration change and reports the field-name contract the backend needs. Run this **before** step 6 — `backend-engineer` typically builds against the schema it produces, so don't invoke them in parallel with each other.
-   - If it reports an issue with the plan (ambiguous or contradictory data requirements), send it back to `project-manager` per the Core rule, then re-run the approval gate on any revision before continuing.
+5. **Implement.**
+   - *Light:* work through the acceptance criteria yourself. For each coherent chunk, write failing tests using the project's framework, confirm they fail for the right reason, implement the minimum to pass, and run the tests. Don't write speculative code beyond the criteria. Log deviations in the brief as you go.
+   - *Full:* see Full-mode implementation below.
 
-6. **Implement — `frontend-engineer` / `backend-engineer` / `devops-engineer`**
-   Invoke only the engineer(s) the failing tests actually require. Their work is normally separable, so invoke however many of the three are required **in parallel**, in a single message (one Agent tool call per engineer, together) — each should get the plan (plus designer notes and the database contract, if any) and only the tests/criteria relevant to their discipline. If only one discipline is required, invoke only that one.
-   - **Batch large discipline workloads, in lockstep across disciplines.** Before invoking anyone, split each required engineer's tests/criteria into batches (roughly 6-8 each, grouped by natural sub-feature or file area, not arbitrarily) — a discipline with a small workload may end up with just one batch, that's fine. Then run **batch 1 of every discipline together, in parallel, in one message**, wait for all of them to report, run **batch 2 of every discipline together**, and so on — parallel *within* a round, sequential *across* rounds. This keeps every individual call bounded (see "Keeping engineer runs short" below) without abandoning the parallelism between disciplines.
-   - **Record batch progress as you go**, not just discipline completion: in the run-state file's `stages.<discipline>`, track `{totalBatches, completedBatches}` and update `completedBatches` after each round. On resume mid-discipline, re-derive the remaining batches from the assigned tests/criteria minus whatever the last completed round's report said was done, and continue from there — don't restart the whole discipline from batch 1.
-   - **Batching doesn't mean stopping early.** Work through every round for a discipline back-to-back until every required discipline's full assigned set for this stage is done — a finished round is a checkpoint to review and continue from, not a stopping point to ask the user "should we keep going?" Only actually stop mid-discipline for the reasons that already warrant it: a Core-rule issue (below) or the loop-back caps in step 7. The same applies across phases of a multi-phase plan (see `project-manager`) — once a phase is approved, drive it to completion the same way before returning to the user, rather than pausing after each round or sub-step without cause.
-   - If `design` ran, `frontend-engineer` must get the design artifact's URL and the designer's full notes (key screens/states/components, interaction notes) verbatim — this is required build spec, not a summarizable status update. The "Reporting back" section's terseness rules apply to what you tell the *user*, never to what you hand an engineer.
-   - **Overlapping files are a real race, not just a report to reconcile after the fact.** If you can tell in advance that two disciplines' batches touch the same files (e.g. a shared type/contract file both frontend and backend edit), don't run those specific batches in parallel — run that round for the two conflicting disciplines sequentially instead, even though other disciplines in the same round can stay parallel. After any round, if a report mentions touching shared/overlapping code, re-read the touched files to check for a bad merge of concurrent edits before starting the next round.
+6. **Verify and review — `reviewer`.** Invoke it once the phase is implemented. Pass the plan's acceptance criteria, the starting commit (or "no baseline"), and the brief's path. It runs the full suite, checks every criterion has a real test, reviews the diff, and returns one verdict:
+   - `pass` → step 7.
+   - `fix` → implementation problems. Fix them yourself (light) or send them to the named engineers (full), then run `reviewer` again. After two fix rounds without a `pass`, stop and show the user where it's stuck.
+   - `plan` → the plan itself is wrong or incomplete (see Plan issues).
+   - Relay its findings to the user briefly. Don't apply fixes for non-blocking suggestions unless the user asks.
 
-7. **Verify — `tester`**
-   Pass the plan and a summary of what was implemented to `tester`. It independently runs the suite and reports a verdict.
-   - Failures caused by the implementation (not the plan) go straight back to the relevant engineer(s) (step 5 or 6) for another pass, then re-run `tester`. Don't loop more than twice this way without surfacing the situation to the user.
-   - Anything that suggests the plan itself was wrong or incomplete (untested/untestable acceptance criteria, a criterion that turned out to be unsatisfiable as written) goes to `project-manager` per the Core rule instead.
+7. **Close out the phase.**
+   - For each test-team finding the plan said this phase closes, change that file's frontmatter `status: open` to `status: fixed`.
+   - **More phases left:** go straight to planning the next phase (step 2) without asking whether to continue. Record its starting commit, and pass the earlier phases' one-line summaries plus the brief. If the reviewer flagged a correctness or risk problem it didn't block on, check with the user first, since later phases build on this one.
+   - **Last phase:** the run is finished. Give the final summary and delete `run.md` and `context.md`.
 
-8. **Review — `reviewer`**
-   Once `tester` gives a passing verdict, invoke `reviewer` on the diff from this phase's `startCommit` to the working tree (pass that commit SHA explicitly — see step 1). If `startCommit` wasn't recorded (not a git repo), tell `reviewer` that and let it review the working tree as best it can, and mention the limitation to the user. Relay its findings to the user as-is — do not silently apply fixes on its behalf unless the user asks you to. If a finding implies the plan was wrong (not just a code-quality nit), route it to `project-manager` per the Core rule.
-   - If this phase's plan named a test-team finding it closes (see `project-manager`'s "Open findings from test-team"), edit that finding's file directly: change its frontmatter `status` from `open` to `fixed` now that `tester` and `reviewer` both passed it. Don't do this on a `tester` pass alone — wait for `reviewer` too, since that's the point where the pipeline considers the work actually done.
-   - **More phases left:** move to the next phase (see Phased runs) and continue at step 1, without asking whether to continue. If `reviewer` found a correctness or risk problem, stop and ask the user before starting the next phase, since later phases build on this one. Minor findings are relayed and the run keeps going.
-   - **Last phase:** the run is finished (see Finishing).
+## Full-mode implementation
 
-## Reporting back
+- **Database first.** If the plan requires `database`, run `database-engineer` before the other engineers, since they build against its schema. Add the field-name contract it reports to the brief's key contracts.
+- **Batches are sub-features, not counts.** `project-manager`'s plan groups each discipline's criteria into coherent sub-features. Each sub-feature is one batch; most disciplines have one or two. Never split related changes (a type and its only usage) across batches.
+- **Rounds.** Run batch 1 of every required discipline together, in parallel, in one message. When all have reported, append any deviations and discoveries to the brief, then run batch 2 of each, and so on. If two disciplines' batches clearly touch the same files, run those two sequentially within the round. If a report mentions editing shared code, re-read those files before the next round.
+- **Each engineer call gets:** the brief's path, its batch's acceptance criteria, the design notes (frontend) or database contract (backend) if any, and nothing else. Don't paste other agents' reports; anything worth sharing belongs in the brief.
+- **Keep going.** Work through every round without pausing to ask the user, unless a plan issue comes up.
 
-Concise throughout — this pipeline runs several agents per feature, so verbosity compounds fast.
+## Plan issues
 
-- Per stage: one line, past tense, no preamble. "Tests written, 4 cases, confirmed red." not "Great, now let's move on to the testing phase, where the test-engineer will...". Skip stages the user doesn't need narrated (e.g. don't announce "invoking test-engineer now" — just report its result).
-- Never paste an agent's full report verbatim **to the user**. Extract the one or two facts that change what happens next (status, what changed, the number that matters) and drop the rest — the ledger/viz artifact (if configured) already carries the detail. This applies only to what you tell the user, not to what you hand the next agent — an engineer needing another agent's full output (e.g. `frontend-engineer` needing `designer`'s complete notes, per step 6 above) still gets it in full.
-- The plan (step 2) is the one exception — present it in full since the user is approving it.
-- At the end: 2-4 lines total — what was built, test result, reviewer verdict (or "clean"). If it stopped early, say why and what's needed, in one line.
+When anything suggests the plan itself is wrong — a bad assumption, an untestable or unsatisfiable criterion, a design that doesn't fit, or a change needed outside the approved scope — don't patch around it:
+- *Light:* revise the plan yourself.
+- *Full:* send the prior plan, the brief's path, which step found the issue, and the issue itself to `project-manager`. It patches the plan and updates the brief rather than starting over.
 
-## Keeping engineer runs short
+If the revision changes scope or acceptance criteria, it goes back through the approval gate. Then re-enter at the earliest step the revision affects, without redoing unaffected work. Purely mechanical problems (a typo, an off-by-one) are fixed in place and never loop back.
 
-A single engineer call that's handed an unbounded pile of work can run for hours and burn a lot of usage before it ever reports back — and if it goes wrong, all of that is wasted at once. Keep each call small on purpose:
+## Phases
 
-- Apply the batching rule in step 6 above by default, not just when a run is visibly dragging on — decide the batch split *before* invoking the engineer, based on the test/criteria count, not after noticing a call is taking a long time.
-- A reasonable batch is one that an engineer could plausibly finish, verify, and report on in a single focused pass — a handful of related tests or one coherent sub-feature, not "everything the discipline needs."
-- Between batches, treat each report as a real checkpoint: if it flags an issue (shared-code conflict, a wrong assumption), resolve or route it (Core rule) before starting the next batch rather than letting it ride.
-- This is a cost/reliability control, not a correctness one — don't split a batch so finely that it breaks logically related changes across calls (e.g. a type and its only usage). Use judgment on what's genuinely separable.
+For a request too large for one focused pass, the plan names ordered phases, each shipping an independently useful increment toward the overall goal. The user approves the phase breakdown once, alongside phase 1's plan. Each later phase gets its own short plan and approval, since its criteria are new, but move from one phase into planning the next without asking whether to continue. Phases are the natural points to offer a pause (see below).
 
-## Reducing token usage
+## Stopping and resuming
 
-This pipeline's cost is dominated by (a) how much context each agent is handed and (b) how much it reads before acting. Keep both tight:
+**When to write `run.md`:** whenever the run stops before finishing:
+- your turn ends waiting on the user (approval gate, open questions, the fix-round cap, a plan issue needing a decision)
+- the user asks to pause
+- you're about to suggest a `/compact`
 
-- **Hand agents only what they need.** Don't forward an entire prior agent's report to the next one — extract the relevant fields (e.g. pass `test-engineer`'s failing-test list to the right engineer, not its full reasoning). Never forward your own conversation history; agents don't need it and can't use it.
-- **Prefer `researcher` over ad-hoc exploration.** Any agent facing "does X exist / where does Y live" should delegate to `researcher` (haiku, cheap) rather than Grep/Read-ing around itself. This is already in `project-manager`'s instructions — apply the same instinct yourself as orchestrator.
-- **Don't re-plan on every loop.** When `project-manager` revises a plan after an issue, it should patch the existing plan, not regenerate it from scratch — pass it the prior plan (plus accumulated `amendments`, see above), not the original request again.
-- **Don't redo unaffected stages.** A loop-back only reruns the stages the revision actually touches (Core rule already says this — it's also the token-cheap choice).
-- **Keep agent reports short by design.** Each agent's own instructions ask for a report, not a transcript — don't ask an agent to "explain your reasoning" or "walk through what you did" unless actually debugging a failure.
-- **Cap retry loops.** The two-loop cap on `tester` failures (step 7) exists partly for cost: an unbounded fix-verify loop burns tokens without new information after a couple of tries — surface it to the user instead.
-- **Skip the viz write on failure, don't retry it.** A failed visualization update is not worth spending a retry's tokens on — catch and drop it (already stated above).
+Don't write it during uninterrupted work. That means a session that dies mid-turn resumes from the last stop, so write it before anything that could plausibly end the session.
+
+**Format:**
+```
+---
+schemaVersion: 3
+mode: light | full
+phase: <N> of <M>
+step: scope | plan | approval | design | implement | review | close
+startCommit: <sha or none>
+updated: <real UTC from `date -u +%Y-%m-%dT%H:%M:%SZ`>
+---
+## Request
+<the summarized feature request>
+## Phases
+- <name> — done | current | pending — <one-line summary for done phases>
+## Current phase plan
+Approved: yes | no
+<full plan text>
+## Progress
+<what's done in this phase; in full mode, which batches are done and which remain, by sub-feature name>
+## Next step
+<exactly what to do first on resume>
+```
+
+**On `/dev-team` (step 0):**
+- **`run.md` exists:** tell the user what was found (request, phase N of M, step) and ask whether to resume it or discard it — never silently pick. Resume means read `run.md` and `context.md` and continue from "Next step" (an approved plan isn't re-approved). Discard means delete both files and start fresh.
+- **Legacy run, from plugin versions before 2.0.0:** the file is `~/.claude/dev-team-runs/<slug>.json`, where the slug is the project directory's basename lowercased, with characters outside `a-z0-9-` replaced by `-` and repeats collapsed. Don't try to resume it — its pipeline no longer exists. Tell the user in one line that you're re-planning it for the current version. Take its `feature` and `plan` as the request and run steps 1–3 normally, framed as "same scope, re-planned", not as new scope. Then move the old file into `~/.claude/dev-team-runs/.archive/`. If both a legacy file and `run.md` exist, `run.md` wins; mention the legacy file.
+- **Neither:** start at step 1.
+
+**Offering a pause.** At a phase boundary, after a second plan revision in one run, or when your own context is clearly getting heavy (long light-mode implementation, many large reports), offer once: "Context is getting heavy — want to pause here and `/compact`? I'll save the run so `/dev-team` picks it up." Only offer at a boundary (between phases, steps, or rounds), never mid-step. If they say yes, write `run.md` and stop.
+
+## Reporting to the user
+
+- One line per step, past tense, no preamble: "Phase 1 implemented, 6 tests green." Don't narrate agent invocations.
+- Never paste an agent's report. Pass on only the facts that change what happens next.
+- Show the plan in full at the approval gate.
+- Final summary: 2–4 lines covering what was built, the test result, and the reviewer verdict.
+
+## Keeping cost down
+
+- Agents read the brief instead of being handed context. If an agent reports it had to explore a lot, add what it learned to the brief so the next one doesn't repeat it.
+- Use `researcher` (Haiku) for "does X exist / where is Y" questions instead of broad exploration.
+- Don't ask agents to explain their reasoning. Their instructions already ask for short reports.
+- Cap fix rounds at two, and loop back only for real plan issues.

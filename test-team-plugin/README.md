@@ -16,7 +16,7 @@ Test engineers run in parallel where more than one level applies; `bug-reporter`
 
 ## Handoff to dev-team
 
-Bug reports are written to `.claude/test-team-findings/<slug>.md` in the target project — see [`agents/bug-reporter.md`](agents/bug-reporter.md) for the exact format. This is the same format the [dev-team](../dev-team-plugin) plugin's `project-manager` agent can be pointed at to plan fixes from. The two plugins don't call each other automatically — run `/test-team` to find and file bugs, then `/dev-team` to fix them.
+Bug reports are written to `.claude/test-team-findings/<slug>.md` in the target project — see [`agents/bug-reporter.md`](agents/bug-reporter.md) for the exact format. The [dev-team](../dev-team-plugin) plugin checks this directory for open findings when it plans a new request, folds matching ones into the plan, and marks them fixed once reviewed. The two plugins don't call each other automatically — run `/test-team` to find and file bugs, then `/dev-team` to fix them.
 
 ## Install
 

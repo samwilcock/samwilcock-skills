@@ -35,7 +35,7 @@ Every run's progress is saved to `~/.claude/dev-team-runs/<project>.json` as it 
 
 ```
 /plugin marketplace add samwilcock/samwilcock-skills
-/plugin install dev-team@dev-team
+/plugin install dev-team@samwilcock-skills
 ```
 
 ## Use
@@ -51,6 +51,6 @@ The skill will call each specialist agent in turn, asking you only when it hits 
 ## Updating
 
 ```
-/plugin marketplace update dev-team
+/plugin marketplace update samwilcock-skills
 /plugin update dev-team
 ```

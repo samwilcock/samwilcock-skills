@@ -1,7 +1,6 @@
-# Any change to the plugin's agents, skills, or manifests requires
+# Any change to a plugin's agents, skills, or manifests requires
 # review from an owner — this is what actually stops a silent removal
 # or behavior change from merging, since CI validates shape, not intent.
-/agents/            @samwilcock
-/skills/            @samwilcock
-/viz/               @samwilcock
+/dev-team-plugin/   @samwilcock
+/test-team-plugin/  @samwilcock
 /.claude-plugin/    @samwilcock

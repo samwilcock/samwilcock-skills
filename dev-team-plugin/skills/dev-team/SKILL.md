@@ -68,12 +68,14 @@ Small, purely mechanical fixes an engineer can resolve within their own step (a 
 1. **Plan — `project-manager`**
    Summarize the feature request and relevant conversation context (the agent has no memory of this chat) and pass it to the `project-manager` agent. It returns a plan: summary, scope, acceptance criteria, required disciplines (`design`/`database`/`frontend`/`backend`/`devops`, any combination), and open questions.
    - If it raises open questions, ask the user before continuing rather than guessing.
+   - If it proposes splitting the request into separate phases (see `project-manager`'s guidance on large requests), treat each phase as its own plan through steps 1-8, in order, toward the overall goal the user asked for.
 
 2. **User approval gate — required before any implementation**
    Present the full plan to the user (summary, scope, acceptance criteria, disciplines required) and ask them to accept it, request changes, or reject it. Do not proceed past this point without explicit approval.
    - If they request changes, send that feedback to `project-manager` as a revision (see Core rule above) and re-present the revised plan. Repeat until approved.
    - Only once approved does the plan's `design` flag get acted on and implementation begin.
    - Approval counts as "about to start work" — see the standalone URL-announcement rule in Live visualization above.
+   - For a phased request, get the user's approval on the phase breakdown itself once, up front, alongside the first phase's plan. After that, each subsequent phase still needs its own plan approved (its acceptance criteria are new), but drive straight from one phase's completion into planning the next rather than stopping to ask whether to continue — the user already agreed to the whole arc. Stop and check in only for a Core-rule issue, a phase's plan raising new open questions, or the user explicitly pausing.
 
 3. **Design — `designer`** *(only if the approved plan requires `design`)*
    Pass the approved plan to `designer`. It uses the `design` skill to produce the design artifact and reports back key screens/states/components and implementation notes for the frontend engineer.
@@ -89,6 +91,7 @@ Small, purely mechanical fixes an engineer can resolve within their own step (a 
 6. **Implement — `frontend-engineer` / `backend-engineer` / `devops-engineer`**
    Invoke only the engineer(s) the failing tests actually require. Their work is normally separable, so invoke however many of the three are required **in parallel**, in a single message (one Agent tool call per engineer, together) — each should get the plan (plus designer notes and the database contract, if any) and only the tests/criteria relevant to their discipline. If only one discipline is required, invoke only that one.
    - **Batch large discipline workloads.** If a single engineer's assigned tests/criteria for this run number more than roughly 6-8, don't hand them all to one call — split them into smaller batches (grouped by natural sub-feature or file area, not arbitrarily) and invoke that engineer once per batch, sequentially, checking its report before starting the next batch. This keeps any one agent invocation bounded instead of open-ended, which is what actually controls session length and usage — see "Keeping engineer runs short" below.
+   - **Batching doesn't mean stopping early.** Work through every batch for a discipline back-to-back until that discipline's full assigned set for this stage is done — a finished batch is a checkpoint to review and continue from, not a stopping point to ask the user "should we keep going?" Only actually stop mid-discipline for the reasons that already warrant it: a Core-rule issue (below) or the loop-back caps in step 7. The same applies across phases of a multi-phase plan (see `project-manager`) — once a phase is approved, drive it to completion the same way before returning to the user, rather than pausing after each batch or sub-step without cause.
    - If `design` ran, `frontend-engineer` must get the design artifact's URL and the designer's full notes (key screens/states/components, interaction notes) verbatim — this is required build spec, not a summarizable status update. The "Reporting back" section's terseness rules apply to what you tell the *user*, never to what you hand an engineer.
    - If multiple engineers reported touching shared/overlapping code, check for conflicts (e.g. re-read the touched files) before moving on.
 

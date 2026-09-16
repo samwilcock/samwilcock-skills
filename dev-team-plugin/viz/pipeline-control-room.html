@@ -1,0 +1,1116 @@
+<title>Pipeline Control Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Light — "blueprint paper": cool vellum ground, ink-navy text, same copper accent. */
+  :root {
+    --ink: #eef1f6;
+    --ink-2: #ffffff;
+    --hairline: #d3d9e3;
+    --text: #1c2130;
+    --text-dim: #55607a;
+    --text-faint: #838da3;
+    --accent: #b96f2c;
+    --accent-soft: rgba(185, 111, 44, 0.12);
+    --done: #1f8a54;
+    --done-soft: rgba(31, 138, 84, 0.12);
+    --blocked: #c53e3e;
+    --blocked-soft: rgba(197, 62, 62, 0.12);
+    --pending: #9aa1b5;
+    --pending-soft: rgba(154, 161, 181, 0.18);
+  }
+
+  /* Dark — the original "mission control" ink. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #12131c;
+      --ink-2: #191b28;
+      --hairline: #2b2e42;
+      --text: #e9e6dd;
+      --text-dim: #8d90a8;
+      --text-faint: #565973;
+      --accent: #d98a3d;
+      --accent-soft: rgba(217, 138, 61, 0.16);
+      --done: #6fcf97;
+      --done-soft: rgba(111, 207, 151, 0.14);
+      --blocked: #eb5757;
+      --blocked-soft: rgba(235, 87, 87, 0.14);
+      --pending: #454863;
+      --pending-soft: rgba(69, 72, 99, 0.2);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #12131c;
+    --ink-2: #191b28;
+    --hairline: #2b2e42;
+    --text: #e9e6dd;
+    --text-dim: #8d90a8;
+    --text-faint: #565973;
+    --accent: #d98a3d;
+    --accent-soft: rgba(217, 138, 61, 0.16);
+    --done: #6fcf97;
+    --done-soft: rgba(111, 207, 151, 0.14);
+    --blocked: #eb5757;
+    --blocked-soft: rgba(235, 87, 87, 0.14);
+    --pending: #454863;
+    --pending-soft: rgba(69, 72, 99, 0.2);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--text);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    padding: 20px 16px 48px;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px 24px;
+    border-bottom: 1px solid var(--hairline);
+    padding-bottom: 14px;
+  }
+
+  .title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    margin: 0;
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 600;
+    font-size: clamp(20px, 3vw, 27px);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .theme-toggle {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--hairline);
+    border-radius: 5px;
+    background: var(--ink-2);
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+  .theme-toggle svg { width: 16px; height: 16px; }
+
+  .run-meta {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 2px;
+  }
+
+  .run-meta b { color: var(--text); font-weight: 500; }
+
+  .project-rail {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .project-chip {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    border: 1px solid var(--hairline);
+    border-radius: 5px;
+    background: var(--ink-2);
+    cursor: pointer;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .project-chip:hover { border-color: var(--text-faint); }
+
+  .project-chip.active {
+    border-color: var(--accent);
+    color: var(--text);
+    background: var(--accent-soft);
+  }
+
+  .project-chip .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+  }
+
+  .dot-pending { background: var(--pending); }
+  .dot-running { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .dot-done { background: var(--done); }
+  .dot-blocked { background: var(--blocked); box-shadow: 0 0 0 3px var(--blocked-soft); }
+  .dot-skipped { background: var(--text-faint); }
+
+  .project-chip .updated {
+    color: var(--text-faint);
+    font-size: 10.5px;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 30px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    background: none;
+    border: 1px solid var(--hairline);
+    border-radius: 5px;
+    padding: 0 10px;
+  }
+
+  .back-link:hover { color: var(--accent); }
+
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+  }
+
+  .dashboard-empty {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--text-faint);
+    border: 1px dashed var(--hairline);
+    border-radius: 6px;
+    padding: 28px 16px;
+    text-align: center;
+  }
+
+  .project-card {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    text-align: left;
+    background: var(--ink-2);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    color: inherit;
+  }
+
+  .project-card:hover { border-color: var(--accent); }
+  .project-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .card-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-name {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 13px;
+    font-weight: 500;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .card-updated {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    color: var(--text-faint);
+    white-space: nowrap;
+  }
+
+  .card-feature {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--text-dim);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-progress {
+    display: flex;
+    gap: 3px;
+  }
+
+  .card-progress span {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--pending);
+  }
+
+  .card-current {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
+  .card-current b { color: var(--accent); font-weight: 500; text-transform: none; letter-spacing: 0; }
+
+  .board {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(280px, 1fr);
+    gap: 18px;
+  }
+
+  @media (max-width: 760px) {
+    .board { grid-template-columns: 1fr; }
+    header { flex-direction: column; align-items: flex-start; }
+  }
+
+  .stage-viz {
+    position: relative;
+    background: var(--ink-2);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    overflow: hidden;
+    aspect-ratio: 16 / 11;
+  }
+
+  .stage-viz canvas { display: block; width: 100%; height: 100%; }
+
+  .viz-caption {
+    position: absolute;
+    left: 14px;
+    bottom: 12px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 0.04em;
+    pointer-events: none;
+  }
+
+  .viz-current {
+    position: absolute;
+    right: 14px;
+    top: 12px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    text-align: right;
+  }
+
+  .viz-current b {
+    display: block;
+    font-size: 14px;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+    margin-top: 2px;
+  }
+
+  .ledger {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    background: var(--ink-2);
+    overflow: hidden;
+  }
+
+  .ledger-head {
+    padding: 10px 14px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .stage-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 4px 12px;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--hairline);
+    align-items: start;
+  }
+
+  .stage-row:last-child { border-bottom: none; }
+
+  .stage-code {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    white-space: nowrap;
+    padding-top: 1px;
+  }
+
+  .stage-body { min-width: 0; }
+
+  .stage-name {
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .model-badge {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    color: var(--text-faint);
+    border: 1px solid var(--hairline);
+    border-radius: 3px;
+    padding: 1px 5px;
+    letter-spacing: 0.03em;
+  }
+
+  .stage-summary {
+    margin: 3px 0 0;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--text-dim);
+  }
+
+  .pill {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 3px;
+    white-space: nowrap;
+    justify-self: end;
+    margin-top: 1px;
+  }
+
+  .pill-pending { color: var(--text-dim); background: var(--pending-soft); }
+  .pill-running { color: var(--accent); background: var(--accent-soft); }
+  .pill-done { color: var(--done); background: var(--done-soft); }
+  .pill-blocked { color: var(--blocked); background: var(--blocked-soft); }
+  .pill-skipped { color: var(--text-faint); background: transparent; }
+
+  .ledger-foot {
+    padding: 11px 14px;
+    background: rgba(217, 138, 61, 0.05);
+  }
+
+  .ledger-foot .stage-code { color: var(--accent); }
+
+  footer {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    color: var(--text-faint);
+    text-align: center;
+    letter-spacing: 0.03em;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stage-viz { --motion: 0; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="title-block">
+      <span class="eyebrow" id="project-eyebrow">dev-team plugin · live tracker</span>
+      <h1 id="feature-title">Pipeline Control Room</h1>
+    </div>
+    <div class="header-actions">
+      <button class="back-link" id="back-link" type="button" hidden>← all projects</button>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch color theme" title="Switch color theme">
+        <svg id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+      </button>
+    </div>
+  </header>
+
+  <div id="dashboard-view">
+    <div class="dashboard-grid" id="dashboard-grid"></div>
+  </div>
+
+  <div id="project-view" hidden>
+    <div class="run-meta" id="run-meta">
+      <span>RUN <b id="run-id">—</b></span>
+      <span>STARTED <b id="run-started">—</b></span>
+      <span>UPDATED <b id="run-updated">—</b></span>
+    </div>
+
+    <div class="project-rail" id="project-rail"></div>
+
+    <div class="board">
+      <div class="stage-viz">
+        <canvas id="scene"></canvas>
+        <div class="viz-caption">site plan view · rooms rise as each stage builds, roof means done · site office is the research spur</div>
+        <div class="viz-current">active stage<b id="viz-current-label">—</b></div>
+      </div>
+
+      <div class="ledger" id="ledger">
+        <div class="ledger-head">stage ledger</div>
+        <!-- rows injected by JS -->
+      </div>
+    </div>
+  </div>
+
+  <footer id="status-line">connecting to live run data…</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // ---------- pipeline definition ----------
+  // Fixed main-line order (matches skills/dev-team/SKILL.md). "research"
+  // is a spur, not numbered, because it's called on demand, not a fixed step.
+  var MAIN_LINE = [
+    { key: "plan",     code: "01", name: "Plan",             agent: "project-manager",  model: "opus" },
+    { key: "approval", code: "02", name: "Approval",         agent: "you",              model: null },
+    { key: "design",   code: "03", name: "Design",           agent: "designer",         model: "sonnet" },
+    { key: "tests",    code: "04", name: "Tests · RED",      agent: "test-engineer",    model: "sonnet" },
+    { key: "database", code: "05", name: "Database",         agent: "database-engineer",model: "sonnet" },
+    { key: "frontend", code: "06a", name: "Build · FE",      agent: "frontend-engineer",model: "sonnet" },
+    { key: "backend",  code: "06b", name: "Build · BE",      agent: "backend-engineer", model: "sonnet" },
+    { key: "devops",   code: "06c", name: "Build · Ops",     agent: "devops-engineer",  model: "sonnet" },
+    { key: "verify",   code: "07", name: "Verify · GREEN",   agent: "tester",           model: "sonnet" },
+    { key: "review",   code: "08", name: "Review",           agent: "reviewer",         model: "sonnet" }
+  ];
+  var SPUR = { key: "researcher", name: "Research", agent: "researcher", model: "haiku" };
+
+  var STATUS_COLOR = { pending: 0x454863, running: 0xd98a3d, done: 0x6fcf97, blocked: 0xeb5757, skipped: 0x2b2e42 };
+  var STATUS_LABEL = { pending: "pending", running: "running", done: "done", blocked: "blocked", skipped: "skipped" };
+
+  // ---------- example seed (a real completed run from this plugin's own testing) ----------
+  // Keyed by project doc id, same as the live "runs" collection — this is what
+  // multiple concurrent /dev-team runs across projects look like in the rail.
+  var EXAMPLE_PROJECTS = {
+    "dev-team-test": {
+      projectName: "dev-team-test",
+      feature: "slugify(str) helper — lowercase, hyphenate, strip invalid chars",
+      runId: "demo-slugify",
+      startedAt: "2026-09-12T09:14:00Z",
+      updatedAt: "2026-09-12T09:21:40Z",
+      current: "done",
+      stages: {
+        plan:     { status: "done", summary: "Scoped to a pure function in slugify.js. No frontend touch; backend-only." },
+        approval: { status: "done", summary: "Plan accepted by user without changes." },
+        design:   { status: "skipped", summary: "Not required — no UI surface in this feature." },
+        tests:    { status: "done", summary: "4 jest cases written against acceptance criteria; confirmed red before implementation." },
+        database: { status: "skipped", summary: "No persistent data involved — pure function only." },
+        frontend: { status: "skipped", summary: "Not required for this feature." },
+        backend:  { status: "done", summary: "slugify.js implemented; all 4 new tests pass locally." },
+        devops:   { status: "skipped", summary: "No CI/deploy changes needed." },
+        verify:   { status: "done", summary: "Full suite green, no regressions, all acceptance criteria covered." },
+        review:   { status: "done", summary: "Clean — no findings. Matches existing module conventions." },
+        researcher: { status: "done", summary: "Checked for an existing slug helper before planning — none found.", calls: 1 }
+      }
+    }
+  };
+
+  var STATUS_RANK = { blocked: 0, running: 1, pending: 2, done: 3, skipped: 3 };
+
+  function projectDotStatus(run) {
+    // worst-status-wins summary for the rail dot: a blocked or running stage
+    // anywhere in the run outranks a project that's merely pending/done.
+    var stages = (run && run.stages) || {};
+    var best = "done";
+    Object.keys(stages).forEach(function (k) {
+      var s = stages[k].status || "pending";
+      if (STATUS_RANK[s] < STATUS_RANK[best]) best = s;
+    });
+    return best;
+  }
+
+  // ---------- DOM: ledger ----------
+  var ledgerEl = document.getElementById("ledger");
+  var vizCurrentLabel = document.getElementById("viz-current-label");
+
+  function fmtTime(iso) {
+    if (!iso) return "—";
+    try {
+      var d = new Date(iso);
+      return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    } catch (e) { return "—"; }
+  }
+
+  function renderLedger(run) {
+    document.getElementById("feature-title").textContent = run.feature || "Pipeline Control Room";
+    document.getElementById("run-id").textContent = run.runId || "—";
+    document.getElementById("run-started").textContent = fmtTime(run.startedAt);
+    document.getElementById("run-updated").textContent = fmtTime(run.updatedAt);
+
+    var currentDef = MAIN_LINE.filter(function (s) { return s.key === run.current; })[0];
+    vizCurrentLabel.textContent = currentDef ? currentDef.name : (run.current === "researcher" ? "Research" : "Idle");
+
+    var html = "";
+    MAIN_LINE.forEach(function (def) {
+      var s = (run.stages && run.stages[def.key]) || { status: "pending", summary: "" };
+      html += stageRow(def.code, def.name, def.agent, def.model, s);
+    });
+    var r = (run.stages && run.stages.researcher) || { status: "pending", summary: "" };
+    html += '<div class="ledger-foot">' + stageRow("↳", SPUR.name + " (on demand)", SPUR.agent, SPUR.model, r) + '</div>';
+
+    ledgerEl.innerHTML = '<div class="ledger-head">stage ledger</div>' + html;
+  }
+
+  function stageRow(code, name, agent, model, s) {
+    var status = s.status || "pending";
+    var pillClass = "pill-" + (STATUS_LABEL[status] ? status : "pending");
+    return (
+      '<div class="stage-row">' +
+        '<div class="stage-code">' + code + '</div>' +
+        '<div class="stage-body">' +
+          '<div class="stage-name">' + name +
+            (model ? '<span class="model-badge">' + model + '</span>' : '') +
+            '<span class="model-badge">' + agent + '</span>' +
+          '</div>' +
+          (s.summary ? '<p class="stage-summary">' + escapeHtml(s.summary) + '</p>' : '') +
+        '</div>' +
+        '<div class="pill ' + pillClass + '">' + (STATUS_LABEL[status] || status) + '</div>' +
+      '</div>'
+    );
+  }
+
+  function escapeHtml(str) {
+    var d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  // ---------- three.js scene: a house floorplan, built room by room ----------
+  // Each pipeline stage is a room in a row (a wing for frontend/backend side
+  // by side, since they build in parallel); researcher is a small site office
+  // off to the side, since it's an on-demand visit, not part of the house.
+  var canvas = document.getElementById("scene");
+  var container = canvas.parentElement;
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x12131c);
+  scene.fog = new THREE.FogExp2(0x12131c, 0.045);
+
+  var camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  scene.add(new THREE.AmbientLight(0x30334a, 1.5));
+  var key = new THREE.PointLight(0xffe1bd, 1.15, 40);
+  key.position.set(3, 7, 5);
+  scene.add(key);
+
+  // site ground — a plot of land the house sits on
+  var ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(20, 10),
+    new THREE.MeshStandardMaterial({ color: 0x181a26, roughness: 0.95 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.03;
+  scene.add(ground);
+  var siteGrid = new THREE.GridHelper(20, 20, 0x262a3c, 0x1c1e2c);
+  siteGrid.position.y = -0.02;
+  scene.add(siteGrid);
+
+  var ROOM_LAYOUT = {
+    plan:       { x: -6.125, z: 0,    w: 1.55, d: 1.35 },
+    approval:   { x: -4.375, z: 0,    w: 1.55, d: 1.35 },
+    design:     { x: -2.625, z: 0,    w: 1.55, d: 1.35 },
+    tests:      { x: -0.875, z: 0,    w: 1.55, d: 1.35 },
+    database:   { x: 0.875,  z: 0,    w: 1.55, d: 1.35 },
+    // the "build" wing: three rooms side by side, since these engineers work in parallel
+    frontend:   { x: 2.625,  z: -0.45, w: 1.55, d: 0.4 },
+    backend:    { x: 2.625,  z: 0,     w: 1.55, d: 0.4 },
+    devops:     { x: 2.625,  z: 0.45,  w: 1.55, d: 0.4 },
+    verify:     { x: 4.375,  z: 0,    w: 1.55, d: 1.35 },
+    review:     { x: 6.125,  z: 0,    w: 1.55, d: 1.35 },
+    researcher: { x: -6.125, z: -2.15, w: 1.05, d: 0.95 }
+  };
+  var WALL_HEIGHT = 0.85;
+
+  var rooms = {}; // key -> { group, wall, wallMat, floor, roof, windows[], beacon, status }
+
+  function makeRoom(key, layout) {
+    var group = new THREE.Group();
+    group.position.set(layout.x, 0, layout.z);
+
+    // footprint outline — the plot marked out on the blueprint before anything is built
+    var hw = layout.w / 2, hd = layout.d / 2;
+    var pts = [
+      new THREE.Vector3(-hw, 0.01, -hd), new THREE.Vector3(hw, 0.01, -hd),
+      new THREE.Vector3(hw, 0.01, hd), new THREE.Vector3(-hw, 0.01, hd),
+      new THREE.Vector3(-hw, 0.01, -hd)
+    ];
+    var footprintGeo = new THREE.BufferGeometry().setFromPoints(pts);
+    var footprintMat = new THREE.LineDashedMaterial({ color: 0x454863, dashSize: 0.12, gapSize: 0.07, transparent: true, opacity: 0.7 });
+    var footprint = new THREE.Line(footprintGeo, footprintMat);
+    footprint.computeLineDistances();
+    group.add(footprint);
+
+    var floor = new THREE.Mesh(
+      new THREE.BoxGeometry(layout.w - 0.06, 0.05, layout.d - 0.06),
+      new THREE.MeshStandardMaterial({ color: 0x21232f, roughness: 0.8, transparent: true, opacity: 0 })
+    );
+    floor.position.y = 0.025;
+    group.add(floor);
+
+    var wallGeo = new THREE.BoxGeometry(layout.w - 0.14, 1, layout.d - 0.14);
+    wallGeo.translate(0, 0.5, 0); // pivot at the base so scale.y grows upward, not from center
+    var wallMat = new THREE.MeshStandardMaterial({ color: STATUS_COLOR.pending, metalness: 0.2, roughness: 0.55, emissive: 0x000000, transparent: true, opacity: 0.9 });
+    var wall = new THREE.Mesh(wallGeo, wallMat);
+    wall.scale.y = 0.0001;
+    group.add(wall);
+
+    var roof = new THREE.Mesh(
+      new THREE.BoxGeometry(layout.w - 0.02, 0.06, layout.d - 0.02),
+      new THREE.MeshStandardMaterial({ color: 0xd98a3d, metalness: 0.3, roughness: 0.4, emissive: 0xd98a3d, emissiveIntensity: 0.15 })
+    );
+    roof.position.y = WALL_HEIGHT + 0.03;
+    roof.visible = false;
+    group.add(roof);
+
+    var windows = [];
+    var winMat1 = new THREE.MeshBasicMaterial({ color: 0xffe1bd, transparent: true, opacity: 0 });
+    var winGeo = new THREE.PlaneGeometry(Math.min(0.22, layout.w * 0.14), 0.16);
+    [-1, 1].forEach(function (side) {
+      var w1 = new THREE.Mesh(winGeo, winMat1.clone());
+      w1.position.set(side * layout.w * 0.22, WALL_HEIGHT * 0.55, hd - 0.075);
+      group.add(w1);
+      windows.push(w1);
+    });
+
+    var beacon = new THREE.Mesh(
+      new THREE.SphereGeometry(0.05, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xeb5757, transparent: true, opacity: 0 })
+    );
+    beacon.position.y = WALL_HEIGHT + 0.14;
+    group.add(beacon);
+
+    scene.add(group);
+    rooms[key] = { group: group, wall: wall, wallMat: wallMat, floor: floor, roof: roof, windows: windows, beacon: beacon, footprintMat: footprintMat, status: "pending", phase: Math.random() * Math.PI * 2 };
+  }
+
+  Object.keys(ROOM_LAYOUT).forEach(function (key) { makeRoom(key, ROOM_LAYOUT[key]); });
+
+  // walkway connecting the main-line rooms, plus a spur path out to the site office.
+  // Rooms sharing an x (the frontend/backend/devops wing) collapse to one waypoint.
+  var walkPts = [];
+  MAIN_LINE.forEach(function (d) {
+    var x = ROOM_LAYOUT[d.key].x;
+    var last = walkPts[walkPts.length - 1];
+    if (!last || last.x !== x) walkPts.push(new THREE.Vector3(x, 0.015, 0));
+  });
+  var walkGeo = new THREE.BufferGeometry().setFromPoints(walkPts);
+  var walkMat = new THREE.LineBasicMaterial({ color: 0x2b2e42, transparent: true, opacity: 0.8 });
+  scene.add(new THREE.Line(walkGeo, walkMat));
+
+  var spurGeo = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(ROOM_LAYOUT.plan.x, 0.015, 0),
+    new THREE.Vector3(ROOM_LAYOUT.researcher.x, 0.015, ROOM_LAYOUT.researcher.z)
+  ]);
+  var spurMat = new THREE.LineDashedMaterial({ color: 0x454863, dashSize: 0.12, gapSize: 0.08, transparent: true, opacity: 0.7 });
+  var spurLine = new THREE.Line(spurGeo, spurMat);
+  spurLine.computeLineDistances();
+  scene.add(spurLine);
+
+  // supervisor marker: hovers over whichever room is currently under construction
+  var supervisorGeo = new THREE.ConeGeometry(0.07, 0.16, 4);
+  var supervisorMat = new THREE.MeshBasicMaterial({ color: 0xd98a3d, transparent: true, opacity: 0 });
+  var supervisor = new THREE.Mesh(supervisorGeo, supervisorMat);
+  scene.add(supervisor);
+
+  // ---------- theme: the page has its own light/dark toggle, independent of
+  // (but consistent with) the viewer's own theme, so the scene needs a
+  // matching pair of ground/fog/footprint colors for each ----------
+  var SCENE_THEME = {
+    dark: { bg: 0x12131c, ground: 0x181a26, gridA: 0x262a3c, gridB: 0x1c1e2c, line: 0x454863, walk: 0x2b2e42 },
+    light: { bg: 0xdde3ee, ground: 0xcfd7e6, gridA: 0xb9c2d6, gridB: 0xc9d0e0, line: 0x6b7386, walk: 0xb0b8ca }
+  };
+
+  function applySceneTheme(mode) {
+    var c = SCENE_THEME[mode] || SCENE_THEME.dark;
+    scene.background.setHex(c.bg);
+    scene.fog.color.setHex(c.bg);
+    ground.material.color.setHex(c.ground);
+    scene.remove(siteGrid);
+    siteGrid = new THREE.GridHelper(20, 20, c.gridA, c.gridB);
+    siteGrid.position.y = -0.02;
+    scene.add(siteGrid);
+    walkMat.color.setHex(c.walk);
+    spurMat.color.setHex(c.line);
+    Object.keys(rooms).forEach(function (key) { rooms[key].footprintMat.color.setHex(c.line); });
+  }
+
+  function applyStatus(key, status) {
+    var room = rooms[key];
+    if (!room) return;
+    room.status = status;
+    var color = STATUS_COLOR[status] || STATUS_COLOR.pending;
+
+    if (status === "pending") {
+      room.wallMat.color.setHex(STATUS_COLOR.pending);
+      room.wallMat.emissive.setHex(0x000000);
+      room.floor.material.opacity = 0;
+      room.roof.visible = false;
+      room.beacon.material.opacity = 0;
+      room.windows.forEach(function (w) { w.material.opacity = 0; });
+    } else if (status === "skipped") {
+      room.wallMat.color.setHex(STATUS_COLOR.skipped);
+      room.wallMat.emissive.setHex(0x000000);
+      room.floor.material.opacity = 0.12;
+      room.roof.visible = false;
+      room.beacon.material.opacity = 0;
+      room.windows.forEach(function (w) { w.material.opacity = 0; });
+    } else if (status === "running") {
+      room.wallMat.color.setHex(color);
+      room.wallMat.emissive.setHex(color);
+      room.wallMat.emissiveIntensity = 0.25;
+      room.floor.material.opacity = 0.95;
+      room.roof.visible = false;
+      room.beacon.material.opacity = 0;
+    } else if (status === "done") {
+      room.wallMat.color.setHex(0x2f3244);
+      room.wallMat.emissive.setHex(color);
+      room.wallMat.emissiveIntensity = 0.06;
+      room.floor.material.opacity = 0.95;
+      room.roof.visible = true;
+      room.beacon.material.opacity = 0;
+      room.windows.forEach(function (w) { w.material.opacity = 0.85; w.material.color.setHex(0xffe1bd); });
+    } else if (status === "blocked") {
+      room.wallMat.color.setHex(0x2f3244);
+      room.wallMat.emissive.setHex(color);
+      room.wallMat.emissiveIntensity = 0.35;
+      room.floor.material.opacity = 0.95;
+      room.roof.visible = true;
+      room.windows.forEach(function (w) { w.material.opacity = 0.8; w.material.color.setHex(color); });
+    }
+  }
+
+  function applyRun(run) {
+    var stages = run.stages || {};
+    MAIN_LINE.forEach(function (def) { applyStatus(def.key, (stages[def.key] || {}).status || "pending"); });
+    applyStatus("researcher", (stages.researcher || {}).status || "pending");
+
+    // supervisor hovers over whichever room is currently running (main line takes
+    // priority over the researcher spur when, unusually, both are active at once)
+    var activeKey = null;
+    MAIN_LINE.forEach(function (def) { if ((stages[def.key] || {}).status === "running") activeKey = def.key; });
+    if (!activeKey && (stages.researcher || {}).status === "running") activeKey = "researcher";
+    supervisor.userData.active = !!activeKey;
+    if (activeKey) {
+      var l = ROOM_LAYOUT[activeKey];
+      supervisor.userData.target = new THREE.Vector3(l.x, WALL_HEIGHT + 0.5, l.z);
+      supervisorMat.opacity = 0.85;
+    } else {
+      supervisorMat.opacity = 0;
+    }
+  }
+
+  function resize() {
+    var w = container.clientWidth, h = container.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+  new ResizeObserver(resize).observe(container);
+  resize();
+
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var clock = new THREE.Clock();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    var t = clock.getElapsedTime();
+
+    if (!reduceMotion) {
+      var angle = t * 0.1;
+      camera.position.set(Math.sin(angle) * 9.5, 6.2 + Math.sin(t * 0.2) * 0.3, Math.cos(angle) * 9.5);
+    } else {
+      camera.position.set(9.5, 6.2, 0);
+    }
+    camera.lookAt(0, 0, 0);
+
+    Object.keys(rooms).forEach(function (key) {
+      var room = rooms[key];
+      var targetY;
+      if (room.status === "done" || room.status === "blocked") {
+        targetY = 1;
+      } else if (room.status === "running") {
+        // a slow, continuous rise-and-settle rather than a hard snap, so a room
+        // that's been "running" a while visibly keeps being worked on
+        targetY = reduceMotion ? 0.9 : 0.55 + Math.sin(t * 1.1 + room.phase) * 0.12 + 0.35;
+      } else {
+        targetY = 0.0001;
+      }
+      room.wall.scale.y += (targetY - room.wall.scale.y) * (reduceMotion ? 1 : 0.08);
+
+      if (room.status === "running" && !reduceMotion) {
+        room.windows.forEach(function (w, i) {
+          w.material.opacity = 0.35 + Math.abs(Math.sin(t * 6 + room.phase + i)) * 0.45;
+          w.material.color.setHex(0xd98a3d);
+        });
+      }
+      if (room.status === "blocked" && !reduceMotion) {
+        var flash = 0.4 + Math.abs(Math.sin(t * 5)) * 0.6;
+        room.beacon.material.opacity = flash;
+        room.beacon.scale.setScalar(1 + Math.sin(t * 5) * 0.15);
+      }
+    });
+
+    if (supervisor.userData.active && !reduceMotion) {
+      supervisor.position.lerp(supervisor.userData.target, 0.06);
+      supervisor.position.y = supervisor.userData.target.y + Math.sin(t * 3) * 0.08;
+      supervisor.rotation.y += 0.05;
+    } else if (supervisor.userData.active) {
+      supervisor.position.copy(supervisor.userData.target);
+    }
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // ---------- theme toggle ----------
+  var themeToggleEl = document.getElementById("theme-toggle");
+  var themeIconEl = document.getElementById("theme-icon");
+  var SUN_PATH = '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>';
+  var MOON_PATH = '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"></path>';
+
+  function storedTheme() {
+    try { return localStorage.getItem("dev-team-viz-theme"); } catch (e) { return null; }
+  }
+  function storeTheme(mode) {
+    try { localStorage.setItem("dev-team-viz-theme", mode); } catch (e) { /* private mode or blocked — just skip persistence */ }
+  }
+  function systemTheme() {
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+
+  function setTheme(mode) {
+    document.documentElement.setAttribute("data-theme", mode);
+    themeIconEl.innerHTML = mode === "dark" ? SUN_PATH : MOON_PATH; // icon shows what you'd switch TO
+    applySceneTheme(mode);
+  }
+
+  themeToggleEl.addEventListener("click", function () {
+    var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    storeTheme(next);
+    setTheme(next);
+  });
+
+  setTheme(storedTheme() || systemTheme());
+
+  // ---------- dashboard + per-project view ----------
+  var statusLine = document.getElementById("status-line");
+  var railEl = document.getElementById("project-rail");
+  var eyebrowEl = document.getElementById("project-eyebrow");
+  var titleEl = document.getElementById("feature-title");
+  var dashboardViewEl = document.getElementById("dashboard-view");
+  var dashboardGridEl = document.getElementById("dashboard-grid");
+  var projectViewEl = document.getElementById("project-view");
+  var backLinkEl = document.getElementById("back-link");
+
+  var projects = {};       // docId -> run data, live across every project running /dev-team
+  var selectedId = null;   // which project's pipeline the project view currently shows
+  var view = "dashboard";  // "dashboard" | "project" — dashboard is always the landing view
+
+  backLinkEl.addEventListener("click", function () { showDashboard(); });
+
+  function relTime(iso) {
+    if (!iso) return "";
+    var ms = Date.now() - new Date(iso).getTime();
+    var min = Math.round(ms / 60000);
+    if (min < 1) return "now";
+    if (min < 60) return min + "m ago";
+    var hr = Math.round(min / 60);
+    if (hr < 24) return hr + "h ago";
+    return Math.round(hr / 24) + "d ago";
+  }
+
+  function currentStageName(run) {
+    var def = MAIN_LINE.filter(function (s) { return s.key === run.current; })[0];
+    return def ? def.name : (run.current === "researcher" ? "Research" : "Idle");
+  }
+
+  function progressBarHtml(run) {
+    var stages = run.stages || {};
+    return '<div class="card-progress">' + MAIN_LINE.map(function (def) {
+      var status = (stages[def.key] || {}).status || "pending";
+      return '<span class="dot-' + status + '"></span>';
+    }).join("") + '</div>';
+  }
+
+  // ---------- dashboard: one card per active project, click to enter it ----------
+  function renderDashboard() {
+    var ids = Object.keys(projects).sort(function (a, b) {
+      return new Date(projects[b].updatedAt || 0) - new Date(projects[a].updatedAt || 0);
+    });
+
+    if (!ids.length) {
+      dashboardGridEl.innerHTML = '<div class="dashboard-empty">No dev-team runs yet. Once /dev-team starts a run with this visualization configured, it shows up here.</div>';
+      return;
+    }
+
+    dashboardGridEl.innerHTML = ids.map(function (id) {
+      var run = projects[id];
+      var dot = projectDotStatus(run);
+      return (
+        '<button class="project-card" type="button" data-id="' + escapeHtml(id) + '">' +
+          '<div class="card-top">' +
+            '<span class="dot dot-' + dot + '"></span>' +
+            '<span class="card-name">' + escapeHtml(run.projectName || id) + '</span>' +
+            '<span class="card-updated">' + relTime(run.updatedAt) + '</span>' +
+          '</div>' +
+          '<p class="card-feature">' + escapeHtml(run.feature || "") + '</p>' +
+          progressBarHtml(run) +
+          '<div class="card-current">now: <b>' + escapeHtml(currentStageName(run)) + '</b></div>' +
+        '</button>'
+      );
+    }).join("");
+
+    Array.prototype.forEach.call(dashboardGridEl.querySelectorAll(".project-card"), function (card) {
+      card.addEventListener("click", function () { enterProject(card.getAttribute("data-id")); });
+    });
+  }
+
+  // ---------- project view: one project's floorplan + ledger, plus a rail to jump to another ----------
+  function renderRail() {
+    var ids = Object.keys(projects).sort(function (a, b) {
+      return new Date(projects[b].updatedAt || 0) - new Date(projects[a].updatedAt || 0);
+    });
+
+    railEl.innerHTML = ids.map(function (id) {
+      var run = projects[id];
+      var dot = projectDotStatus(run);
+      var active = id === selectedId ? " active" : "";
+      return (
+        '<div class="project-chip' + active + '" data-id="' + escapeHtml(id) + '">' +
+          '<span class="dot dot-' + dot + '"></span>' +
+          '<span>' + escapeHtml(run.projectName || id) + '</span>' +
+          '<span class="updated">' + relTime(run.updatedAt) + '</span>' +
+        '</div>'
+      );
+    }).join("");
+
+    Array.prototype.forEach.call(railEl.querySelectorAll(".project-chip"), function (chip) {
+      chip.addEventListener("click", function () { enterProject(chip.getAttribute("data-id")); });
+    });
+  }
+
+  function showSelectedProject() {
+    if (!selectedId || !projects[selectedId]) { showDashboard(); return; }
+    var run = projects[selectedId];
+    eyebrowEl.textContent = "dev-team plugin · live tracker";
+    titleEl.textContent = run.projectName || selectedId;
+    renderLedger(run);
+    applyRun(run);
+  }
+
+  function enterProject(id) {
+    if (!projects[id]) return;
+    selectedId = id;
+    view = "project";
+    dashboardViewEl.hidden = true;
+    projectViewEl.hidden = false;
+    backLinkEl.hidden = false;
+    renderRail();
+    showSelectedProject();
+  }
+
+  function showDashboard() {
+    view = "dashboard";
+    selectedId = null;
+    projectViewEl.hidden = true;
+    dashboardViewEl.hidden = false;
+    backLinkEl.hidden = true;
+    eyebrowEl.textContent = "dev-team plugin · live tracker";
+    titleEl.textContent = "Pipeline Control Room";
+    renderDashboard();
+  }
+
+  // any live update re-renders whichever view is showing, and keeps a project
+  // view's data fresh even if you're not looking at the dashboard right now
+  function rerender() {
+    if (view === "dashboard") {
+      renderDashboard();
+    } else {
+      if (!projects[selectedId]) { showDashboard(); return; }
+      renderRail();
+      showSelectedProject();
+    }
+  }
+
+  // resting-state content: a real completed run from this plugin's own test pass
+  projects = EXAMPLE_PROJECTS;
+  showDashboard();
+
+  (async function () {
+    try {
+      var db = window.claude && (await window.claude.use("db"));
+      if (!db) {
+        statusLine.textContent = "showing last known runs · example data (live db unavailable in this view)";
+        return;
+      }
+      db.collection("runs").onSnapshot(
+        function (snap) {
+          var live = {};
+          snap.docs.forEach(function (doc) { live[doc.id] = doc.data(); });
+          if (snap.size > 0) projects = live; // once live data exists, it fully replaces the example seed
+          statusLine.textContent = "live · tracking " + snap.size + " project" + (snap.size === 1 ? "" : "s");
+          rerender();
+        },
+        function (err) {
+          statusLine.textContent = "live updates unavailable (" + err.code + ") · showing last known runs";
+        }
+      );
+    } catch (e) {
+      statusLine.textContent = "showing last known runs · example data (live db unavailable in this view)";
+    }
+  })();
+})();
+</script>

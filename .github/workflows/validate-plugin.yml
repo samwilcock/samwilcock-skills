@@ -15,5 +15,8 @@ jobs:
       - name: Validate manifests and agent/skill frontmatter
         run: ./scripts/validate-plugin.sh
 
+      - name: Run script tests
+        run: ./scripts/test.sh
+
       - name: Check version bump on agent/skill/manifest changes
         run: BASE_REF=origin/${{ github.base_ref }} ./scripts/check-version-bump.sh

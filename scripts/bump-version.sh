@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Bumps one plugin's version in its plugin.json by a single semver step and adds
-# a "## [<plugin> <version>] - <today>" section to the top of CHANGELOG.md with
-# empty Added/Changed/Fixed/Removed headings to fill in. Delete the headings you
+# a "## [<plugin> <version>] - <today>" section to CHANGELOG.md with empty
+# Added/Changed/Fixed/Removed headings to fill in. The section goes above every
+# released one; when this branch bumps several plugins, their sections follow
+# the plugin order in marketplace.json. Delete the headings you
 # don't use; CI rejects empty ones and sections without a bullet.
 #
 # Refuses to run if the plugin's version already differs from $BASE_REF, since
@@ -52,7 +54,16 @@ trap 'rm -f "$manifest_tmp" "$changelog_tmp"' EXIT
 
 jq --arg v "$new_version" '.version = $v' "$manifest" > "$manifest_tmp"
 
-# Insert the new section just before the first existing version heading.
+# Sections already added on this branch (headings not in $BASE_REF's changelog)
+# sit above the released ones, in marketplace order. Insert the new section
+# before the first heading that's either released or belongs to a plugin later
+# in marketplace order. Without a base ref there's no way to tell which sections
+# are this branch's, so every existing one counts as released and the new
+# section goes on top.
+HAS_BASE=0
+git rev-parse --verify -q "$BASE_REF" >/dev/null && HAS_BASE=1
+BASE_HEADINGS=$(git show "$BASE_REF:CHANGELOG.md" 2>/dev/null | grep '^## \[' || true)
+PLUGIN_ORDER=" $(jq -r '.plugins[].name' .claude-plugin/marketplace.json | tr '\n' ' ')"
 SECTION="## [$name $new_version] - $(date +%F)
 
 ### Added
@@ -62,8 +73,18 @@ SECTION="## [$name $new_version] - $(date +%F)
 ### Fixed
 
 ### Removed
-" awk '
-  !done && /^## \[/ { print ENVIRON["SECTION"]; done = 1 }
+" NAME="$name" HAS_BASE="$HAS_BASE" BASE_HEADINGS="$BASE_HEADINGS" PLUGIN_ORDER="$PLUGIN_ORDER" awk '
+  function rank(plugin) { return index(ENVIRON["PLUGIN_ORDER"], " " plugin " ") }
+  BEGIN {
+    n = split(ENVIRON["BASE_HEADINGS"], lines, "\n")
+    for (i = 1; i <= n; i++) released[lines[i]] = 1
+  }
+  !done && /^## \[/ {
+    split(substr($0, 5), parts, / /)
+    if (ENVIRON["HAS_BASE"] == "0" || ($0 in released) || rank(parts[1]) > rank(ENVIRON["NAME"])) {
+      print ENVIRON["SECTION"]; done = 1
+    }
+  }
   { print }
   END { if (!done) print "\n" ENVIRON["SECTION"] }
 ' CHANGELOG.md > "$changelog_tmp"

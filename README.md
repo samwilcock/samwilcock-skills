@@ -56,10 +56,12 @@ Once your change is ready, run `/ship-plugin-change` in your clone of this repo.
    BASE_REF=origin/main ./scripts/check-version-bump.sh
    ```
 
+   If you changed anything in `scripts/`, also run `./scripts/test.sh`. Tests live in `scripts/tests/`; each runs the scripts against a throwaway git repo.
+
 4. Open a PR and fill in the template.
 
 ### What CI checks
 
-On every PR, CI runs both scripts. It fails if a plugin changed without a single-step version bump, if a bumped version has no changelog section, or if a changelog section is badly formatted: a wrong heading, an empty heading, or no bullet points.
+On every PR, CI runs both scripts and `./scripts/test.sh`. It fails if a plugin changed without a single-step version bump, if a bumped version has no changelog section, or if a changelog section is badly formatted: a wrong heading, an empty heading, or no bullet points.
 
 When the PR merges, the release workflow tags each new version as `<plugin>-v<version>` (for example `dev-team-v2.1.0`) and publishes a GitHub release with its changelog section as the notes.

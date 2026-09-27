@@ -12,11 +12,23 @@ A Claude Code plugin that builds features with TDD. You approve a plan before an
 **Full** — for well-specified work that needs two or more of database/frontend/backend/devops with changes that are mostly in separate files. It adds:
 - **project-manager** (Opus) — plans the work and writes the context brief
 - **database-engineer** — schema and migrations, run before the other engineers
-- **frontend-engineer** / **backend-engineer** / **devops-engineer** — each writes its own failing tests, then the code, for one sub-feature at a time, running in parallel with each other
+- **frontend-engineer** / **backend-engineer** / **devops-engineer** — each builds one sub-feature at a time with TDD, running in parallel with each other
 
 The mode is picked automatically and stated with the plan. Say "light" or "full" in your request to force one, or switch at the approval step.
 
 Exploratory or tightly coupled work — reworking editor interactions, a tricky refactor, anything you'd figure out by iterating — is much cheaper in light mode. Every subagent starts cold and has to re-read the code it works on.
+
+## How TDD works here
+
+Whoever implements, the session in light mode or an engineer in full mode, works through the acceptance criteria one at a time:
+
+1. Write one test for the criterion and watch it fail.
+2. Write the minimum code to make it pass.
+3. Move to the next criterion.
+
+Once every criterion passes, they refactor with the tests staying green. Writing all the tests first tends to produce tests of imagined behavior. Going one criterion at a time means each test is checked against real code as soon as it's written.
+
+Tests check behavior through public interfaces: exported functions, API endpoints, what a user sees. They mock only what the project doesn't control, like external services and time. That way a refactor that doesn't change behavior doesn't break them. The reviewer flags tests that reach into internals.
 
 ## How cost is kept down
 

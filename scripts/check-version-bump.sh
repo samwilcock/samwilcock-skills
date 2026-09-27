@@ -19,6 +19,13 @@ if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
   exit 0
 fi
 
+# Compare the working tree (committed and uncommitted changes) against where
+# this branch left $BASE_REF, so the check works before committing too.
+BASE_COMMIT=$(git merge-base "$BASE_REF" HEAD)
+changed_since_base() {
+  { git diff --name-only "$BASE_COMMIT" -- "$@"; git ls-files --others --exclude-standard -- "$@"; } | sort -u
+}
+
 fail=0
 
 # Fails the check unless CHANGELOG.md has a "## [<plugin> <version>]" section
@@ -39,13 +46,13 @@ plugin_dirs=$(jq -r '.plugins[].source' .claude-plugin/marketplace.json | sed 's
 for dir in $plugin_dirs; do
   echo "-- checking plugin: $dir --"
 
-  changed=$(git diff --name-only "$BASE_REF"...HEAD -- "$dir/agents/" "$dir/skills/" "$dir/viz/" "$dir/templates/" "$dir/.claude-plugin/" || true)
+  changed=$(changed_since_base "$dir/agents/" "$dir/skills/" "$dir/viz/" "$dir/templates/" "$dir/.claude-plugin/")
   if [ -z "$changed" ]; then
     echo "ok: no agent/skill/viz/manifest changes in $dir, no version bump required"
     continue
   fi
 
-  version_changed=$(git diff --name-only "$BASE_REF"...HEAD -- "$dir/.claude-plugin/plugin.json" || true)
+  version_changed=$(changed_since_base "$dir/.claude-plugin/plugin.json")
   if [ -z "$version_changed" ]; then
     echo "FAIL: these files changed but $dir/.claude-plugin/plugin.json's version was not bumped:" >&2
     echo "$changed" | sed 's/^/  /' >&2

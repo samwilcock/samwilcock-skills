@@ -1,8 +1,17 @@
 # test-team
 
-A Claude Code plugin that gives you a specialist testing team:
+A Claude Code plugin that gives you a specialist testing team for existing code. It tries to break the code, runs test plans, and files what it finds as bug reports. It covers what [dev-team](../dev-team-plugin) doesn't:
 
-1. **unit-test-engineer** — writes isolated unit tests for functions/modules/components
+- code dev-team didn't build
+- bugs the builder didn't think of
+- flows that span several features
+- written test plans
+
+To build a new feature test-first, use dev-team instead.
+
+The team:
+
+1. **unit-test-engineer** — writes unit tests for functions/modules/components, mocking only external systems
 2. **integration-test-engineer** — writes tests across real seams (services, database, modules composed together)
 3. **e2e-test-engineer** — writes full-flow tests against the real running app
 4. **test-plan-runner** — executes a manual/scripted test plan and records pass/fail per scenario
@@ -41,3 +50,8 @@ The skill scopes the run (which test levels apply), dispatches the relevant spec
 /plugin marketplace update samwilcock-skills
 /plugin update test-team
 ```
+
+## Upgrading to 2.0.0
+
+- test-team no longer writes tests for features that haven't been built. Use `/dev-team` for that; it builds features test-first, one criterion at a time.
+- `unit-test-engineer` now mocks only external systems (services, the network, the database, the filesystem, time) and runs your own modules for real, so its tests survive refactors.

@@ -37,12 +37,12 @@ Pick the mode at step 1 from the request plus a quick look at the repo layout â€
    - *Full:* invoke `project-manager` with the summarized request and anything you already learned while scoping. It returns the plan and writes `context.md`.
    - For a large request, the plan splits into phases (see Phases). Ask the user about any open questions before continuing.
 
-3. **Approval gate.** Present the full plan: summary, scope, acceptance criteria, disciplines, mode, and phases if any. Don't implement anything until the user approves it. On requested changes, revise (full mode: send the feedback and the prior plan to `project-manager`) and present it again.
+3. **Approval gate.** Present the full plan: summary, scope, acceptance criteria, interface changes, disciplines, mode, and phases if any. Don't implement anything until the user approves it. On requested changes, revise (full mode: send the feedback and the prior plan to `project-manager`) and present it again.
 
 4. **Design** *(only if the plan requires `design`)*. Invoke `designer` with the approved plan. Its artifact URL and full notes are build spec: in light mode read the artifact yourself, and in full mode pass both verbatim to `frontend-engineer`.
 
 5. **Implement.**
-   - *Light:* work through the acceptance criteria yourself. For each coherent chunk, write failing tests using the project's framework, confirm they fail for the right reason, implement the minimum to pass, and run the tests. Don't write speculative code beyond the criteria. Log deviations in the brief as you go.
+   - *Light:* work through the acceptance criteria yourself, one at a time and in order. For each: write one test using the project's framework, run it and confirm it fails for the right reason, write the minimum code to pass it, and run it again. Don't write tests for later criteria ahead of their code, or code no test needs yet. When every criterion passes, refactor what you wrote without changing behavior and rerun the tests. Test through public interfaces (exported functions, endpoints, what a user sees), check results the same way rather than through the database or internal state, and mock only boundaries you don't control, like external services and time. Log deviations in the brief as you go.
    - *Full:* see Full-mode implementation below.
 
 6. **Verify and review â€” `reviewer`.** Invoke it once the phase is implemented. Pass the plan's acceptance criteria, the starting commit (or "no baseline"), and the brief's path. It runs the full suite, checks every criterion has a real test, reviews the diff, and returns one verdict:

@@ -1,6 +1,6 @@
 {
   "name": "dev-team",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Builds features with TDD: a light mode (default) where the session plans and implements itself, and a full mode that runs specialist database/frontend/backend/devops engineers in parallel for well-specified multi-discipline work. User-approved plans, a shared context brief so agents don't re-explore the codebase, one reviewer that verifies and reviews each phase, phased delivery for large requests, and resumable paused runs.",
   "author": {
     "name": "Sam Wilcock"

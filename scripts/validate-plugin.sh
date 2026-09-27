@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Validates the root marketplace manifest and every plugin's manifest/agent/skill
-# frontmatter in this repo.
+# Validates the root marketplace manifest, every plugin's manifest/agent/skill
+# frontmatter, and the format of CHANGELOG.md in this repo.
 # Run locally with: ./scripts/validate-plugin.sh
 # Used by .github/workflows/validate-plugin.yml on every PR.
 set -euo pipefail
@@ -107,6 +107,65 @@ for dir in "${plugin_dirs[@]}"; do
     ok "checked skill frontmatter in $dir/skills/"
   fi
 done
+
+# ---------- CHANGELOG.md ----------
+# Every "## " heading must be "## [<plugin> <major.minor.patch>] - <YYYY-MM-DD>"
+# for a plugin in marketplace.json, appear once, and have at least one bullet.
+# "### " headings must be Added, Changed, Fixed or Removed, with content under
+# them. Keeps release notes consistent and catches unfilled bump-version.sh stubs.
+echo ""
+echo "-- checking CHANGELOG.md --"
+if [ ! -f CHANGELOG.md ]; then
+  err "CHANGELOG.md is missing"
+else
+  plugin_names=$(jq -r '.plugins[].name' "$MARKET_JSON" | tr '\n' ' ')
+  changelog_errors=$(awk -v names=" $plugin_names" '
+    function close_sub() {
+      if (sub_heading != "" && !sub_has_content)
+        print "line " sub_line ": \"" sub_heading "\" has nothing under it - fill it in or delete it"
+      sub_heading = ""
+    }
+    function close_section() {
+      close_sub()
+      if (section != "" && !bullets)
+        print "line " section_line ": \"" section "\" has no bullet points"
+      section = ""
+    }
+    /^## / {
+      close_section()
+      section = $0; section_line = NR; bullets = 0
+      if ($0 !~ /^## \[[a-z0-9-]+ [0-9]+\.[0-9]+\.[0-9]+\] - [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/) {
+        print "line " NR ": \"" $0 "\" should look like \"## [<plugin> <version>] - <YYYY-MM-DD>\""
+        next
+      }
+      split(substr($0, 5), parts, /[] ]/)
+      if (index(names, " " parts[1] " ") == 0)
+        print "line " NR ": \"" parts[1] "\" is not a plugin in marketplace.json"
+      key = parts[1] " " parts[2]
+      if (key in seen) print "line " NR ": \"" key "\" also appears on line " seen[key]
+      else seen[key] = NR
+      next
+    }
+    /^### / {
+      close_sub()
+      sub_heading = $0; sub_line = NR; sub_has_content = 0
+      if ($0 !~ /^### (Added|Changed|Fixed|Removed)$/)
+        print "line " NR ": \"" $0 "\" should be one of ### Added, ### Changed, ### Fixed, ### Removed"
+      next
+    }
+    /^[[:space:]]*$/ { next }
+    {
+      if (sub_heading != "") sub_has_content = 1
+      if (section != "" && /^- /) bullets = 1
+    }
+    END { close_section() }
+  ' CHANGELOG.md)
+  if [ -n "$changelog_errors" ]; then
+    while IFS= read -r line; do err "CHANGELOG.md $line"; done <<< "$changelog_errors"
+  else
+    ok "CHANGELOG.md headings and sections are well formed"
+  fi
+fi
 
 if [ "$fail" -ne 0 ]; then
   echo "" >&2

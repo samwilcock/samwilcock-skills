@@ -27,7 +27,7 @@ require_changelog() {
   local dir="$1" version="$2" name
   name=$(jq -r .name "$dir/.claude-plugin/plugin.json")
   if [ -z "$(./scripts/changelog-section.sh "$name" "$version")" ]; then
-    echo "FAIL: CHANGELOG.md has no \"## [$name $version]\" section — add one describing this release" >&2
+    echo "FAIL: CHANGELOG.md has no \"## [$name $version]\" section — add one describing this release (./scripts/bump-version.sh adds it when bumping)" >&2
     fail=1
   else
     echo "ok: CHANGELOG.md has a section for $name $version"
@@ -49,6 +49,7 @@ for dir in $plugin_dirs; do
   if [ -z "$version_changed" ]; then
     echo "FAIL: these files changed but $dir/.claude-plugin/plugin.json's version was not bumped:" >&2
     echo "$changed" | sed 's/^/  /' >&2
+    echo "  Run ./scripts/bump-version.sh <plugin> <major|minor|patch> to bump it and add a changelog section." >&2
     fail=1
     continue
   fi

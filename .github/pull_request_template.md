@@ -5,7 +5,7 @@
 ## Checklist
 
 - [ ] I bumped the version in the affected plugin's `.claude-plugin/plugin.json` (required if that plugin's `agents/`, `skills/`, `templates/`, or `.claude-plugin/` changed) — as a single semver step: **major** for a breaking change to an agent/skill's behavior or interface, **minor** for a new agent/skill/capability that's backwards compatible, **patch** for a fix or small tweak. A change touching both plugins bumps both.
-- [ ] I added a `## [<plugin> <version>] - <date>` section to the top of `CHANGELOG.md` for each bumped plugin. It becomes that version's GitHub release notes when this merges.
+- [ ] I added a `## [<plugin> <version>] - <date>` section to the top of `CHANGELOG.md` for each bumped plugin (`./scripts/bump-version.sh` or `/ship-plugin-change` does this). It becomes that version's GitHub release notes when this merges.
 - [ ] I ran `./scripts/validate-plugin.sh` locally and it passes
 - [ ] I ran `BASE_REF=origin/main ./scripts/check-version-bump.sh` locally and it passes
 - [ ] I tested this with a real `/dev-team` and/or `/test-team` run (not just read through it)

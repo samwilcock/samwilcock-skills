@@ -12,6 +12,7 @@ You'll be given the phase's acceptance criteria, the path to the context brief (
 1. **Work out what changed.** Use `git diff <starting SHA>` for modified files, plus `git status --porcelain` for new untracked files, which the diff doesn't show — read those too. Ignore `.claude/dev-team/` and `.claude/test-team-findings/`. With no starting SHA, review the uncommitted changes and say in your report that the scope may include unrelated work. Don't stash, reset, or check out anything.
 2. **Run the full test suite**, not just the new tests. Classify each failure as caused by this phase's changes, pre-existing and unrelated (e.g. the test touches nothing that changed), or flaky/environmental — give evidence, don't guess.
 3. **Check the tests match the criteria.** Every acceptance criterion needs a test that would actually fail if the behavior broke. Flag criteria with no test, or with a trivially passing one.
+   Also flag tests tied to the implementation instead of the behavior: ones that call private functions, mock the project's own modules, check results by querying the database or inspecting internal state, or would break under a refactor that doesn't change behavior. These are `fix` findings, since a test like that can pass while the feature is broken.
 4. **Review the diff** for:
    - correctness against the criteria, including edge cases the tests miss
    - unnecessary abstraction or duplication of existing code

@@ -15,14 +15,15 @@ Report it back in full; the caller presents it to the user for approval.
 
 1. **Summary** — one or two sentences on what's being built and why.
 2. **Scope** — what's in and, explicitly, what's out. Keep it as small as satisfies the request.
-3. **Acceptance criteria** — concrete, testable, observable behaviors (not implementation details). Engineers write tests directly against these.
-4. **Disciplines** — which of `design`, `database`, `frontend`, `backend`, `devops` the criteria actually require, based on the real codebase:
+3. **Acceptance criteria** — concrete, testable, observable behaviors (not implementation details), most important first. Engineers work through them in order, one test at a time, so the first criteria should be the core behavior the rest builds on.
+4. **Interface changes** — the new or changed public interfaces the criteria need: exported functions, API endpoints, component props, events, CLI commands. Give each one's shape (name, inputs, outputs) in a line. Design them so every criterion can be tested through them, without reaching into internals. Write "none" if the work only changes behavior behind existing interfaces.
+5. **Disciplines** — which of `design`, `database`, `frontend`, `backend`, `devops` the criteria actually require, based on the real codebase:
    - `design`: new or changed UI that isn't already specified — not backend-only or copy-only changes.
    - `database`: new or changed persistent structures — not reads/writes through an existing, sufficient schema.
    - `devops`: CI/CD, deployment, infrastructure, or environment config — not app code running in the existing pipeline.
-5. **Work breakdown** — for each required implementation discipline, group its criteria into coherent sub-features. Each group becomes one batch for that discipline's engineer. Most disciplines need one or two groups; never split tightly related changes across groups. Note any files two disciplines will both need to edit.
-6. **Phases** *(only for large requests)* — if the request naturally splits into independently useful increments (e.g. "add search" then "add filters on top of search"), name the phases in order with a one-line goal each, and scope this plan to phase 1 only. A phased plan is meant to run to completion, so each phase must leave the codebase in a working state.
-7. **Open questions** — only what the user genuinely needs to decide. Make a reasonable call on anything else and state the assumption.
+6. **Work breakdown** — for each required implementation discipline, group its criteria into coherent sub-features, keeping them in priority order. Each group becomes one batch for that discipline's engineer. Most disciplines need one or two groups; never split tightly related changes across groups. Note any files two disciplines will both need to edit.
+7. **Phases** *(only for large requests)* — if the request naturally splits into independently useful increments (e.g. "add search" then "add filters on top of search"), name the phases in order with a one-line goal each, and scope this plan to phase 1 only. A phased plan is meant to run to completion, so each phase must leave the codebase in a working state.
+8. **Open questions** — only what the user genuinely needs to decide. Make a reasonable call on anything else and state the assumption.
 
 ## 2. The context brief
 
@@ -39,7 +40,7 @@ Write it to `.claude/dev-team/context.md` in the project (create the directory i
 - Patterns to follow (component structure, error handling, naming, etc.)
 
 ## Key contracts
-- Types, APIs, schemas, or events that more than one part of the work depends on
+- Types, APIs, schemas, or events that more than one part of the work depends on, including the plan's interface changes
 
 ## Gotchas
 - Non-obvious constraints, fragile areas, things that look reusable but aren't

@@ -1,17 +1,18 @@
 ---
 name: test-team
-description: Run a testing pass through a specialist testing team - unit/integration/e2e test engineers write tests for the target area, a test-plan runner executes any scripted/manual scenarios, and a bug reporter turns every real failure into a structured bug report file the dev-team plugin can consume. Use when the user asks to test, write tests for, run a test plan against, or find bugs in an area of the codebase with the "test team", or explicitly invokes /test-team.
+description: Test existing code and hunt for bugs with a specialist testing team - unit/integration/e2e test engineers write tests that try to break the target area, a test-plan runner executes any scripted/manual scenarios, and a bug reporter turns every real failure into a structured bug report file the dev-team plugin can consume. Use when the user asks to test, add tests to, run a test plan against, or find bugs in existing code with the "test team", or explicitly invokes /test-team. Not for building new features test-first; that's dev-team.
 ---
 
 # Test Team
 
-Orchestrate a small set of specialist testing subagents (defined in this plugin's `agents/` directory) to cover a target area of the codebase or a feature, and surface real findings as structured bug reports. You are the orchestrator: call each agent via the Agent tool, pass along what it needs, and use its report to decide what happens next. Do not write tests or run test plans yourself — delegate it.
+Orchestrate a small set of specialist testing subagents (defined in this plugin's `agents/` directory) to test an existing area of the codebase or a feature, hunt for bugs in it, and surface real findings as structured bug reports. This covers what dev-team doesn't: code it didn't build, bugs its builders didn't think of, flows that span several features, and test plans. You are the orchestrator: call each agent via the Agent tool, pass along what it needs, and use its report to decide what happens next. Do not write tests or run test plans yourself — delegate it.
 
 ## Scoping the run
 
 Before dispatching agents, work out from the user's request:
 - **Target**: a feature, module, flow, or "the whole app" — whatever was named or is clearly implied by conversation context.
 - **Which test levels apply**: unit, integration, e2e, or a specific test plan — default to unit + integration for a code-level target, add e2e when the target is a user-facing flow, and use only test-plan-runner when the user hands you an explicit plan to execute rather than asking for new tests.
+- If the request is to write tests for a feature that doesn't exist yet, don't start a run. Tell the user to use `/dev-team`, which builds features test-first, one criterion at a time.
 - If genuinely ambiguous (e.g. "test the app" with no other context, in a large codebase), ask the user to scope it rather than guessing at the whole surface area.
 - If the user hasn't provided a test plan but the run will include `test-plan-runner`, you can point them at this plugin's `${CLAUDE_PLUGIN_ROOT}/templates/test-plan.md` for the standard shape (target, preconditions, numbered scenarios with steps/expected result/priority) — worth mentioning once, not forcing; `test-plan-runner` derives one in that same shape if none is given.
 
@@ -25,7 +26,8 @@ Before dispatching agents, work out from the user's request:
 
 ## Core rules
 
-- A failing test that was **written test-first** against unimplemented behavior (TDD-style, e.g. testing a feature the dev team hasn't built yet) is not a bug — don't report it. Only report failures against code that's supposed to already work.
+- The goal is finding bugs, not raising coverage. Engineers work out correct behavior from how the code is used (callers, UI, API, docs), not by mirroring the implementation, and test through public interfaces.
+- Everything under test is supposed to already work, so a failing test is either a real bug or a mistake in the test. Have the engineer say which before anything is reported.
 - A failing test that **is** a real bug against existing behavior should not be left red in the project's normal test run — that breaks the user's CI/local suite for something this skill's job is to report, not to break the build over. Have the engineer that wrote it mark the test skipped/pending with a comment referencing the bug report's file path (write the test and the skip together; `bug-reporter` runs after, so reference the slug you expect it to use), rather than leaving a failing assertion in place.
 - If an agent reports it couldn't verify something (couldn't boot the app, no test database, etc.), don't silently drop that — tell the user and note it as a limitation of the run, since it means coverage is incomplete.
 - Keep the user briefly informed between stages (one line per stage transition), and give a final summary: what was tested, what passed, what bugs were filed (with paths under `.claude/test-team-findings/`) and their severities.

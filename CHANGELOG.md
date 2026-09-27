@@ -2,6 +2,34 @@
 
 All notable changes to the plugins in this marketplace, newest first. Each heading is one plugin version, published as a GitHub release tagged `<plugin>-v<version>` (for example `dev-team-v2.1.0`). A change that touches both plugins has a heading for each.
 
+## [dev-team 2.2.0] - 2026-09-27
+
+### Added
+- Engineers refactor once every test in their batch passes, cleaning up without changing behavior and keeping the tests green.
+- `project-manager` plans list the public interfaces the work adds or changes, such as functions, endpoints and component props, so each criterion can be tested through them.
+
+### Changed
+- Engineers, and the session itself in light mode, work through acceptance criteria one at a time: write one test, watch it fail, write the minimum code to pass it, then move to the next. Previously they wrote every test for a batch before any code, which tends to produce tests of imagined behavior.
+- Engineers test behavior through public interfaces, check results the same way instead of querying the database or internal state, and mock only what the project doesn't control, like external services and time.
+- `reviewer` flags tests tied to the implementation, such as ones that mock the project's own code or call private functions, as problems to fix.
+- `project-manager` orders acceptance criteria with the most important behavior first.
+
+(#24)
+
+## [test-team 2.0.0] - 2026-09-27
+
+test-team is now for testing existing code and hunting bugs in it. It no longer writes tests for features that haven't been built yet. dev-team now builds features one test at a time, so tests written ahead by a separate team would duplicate that work.
+
+### Changed
+- The test engineers aim to find where code breaks, not to raise coverage. They work out correct behavior from how the code is used, not from its implementation, and focus on edge cases, error paths and boundaries.
+- `unit-test-engineer` runs the project's own code for real and mocks only external systems: services, the network, the database, the filesystem, and time. Tests go through each unit's public interface, so they survive refactors.
+- Every failing test is checked to be either a real bug or a mistake in the test before anything is reported.
+
+### Removed
+- Writing tests for a feature that doesn't exist yet. `/test-team` now points you to `/dev-team`, which builds the feature test-first.
+
+(#24)
+
 ## [dev-team 2.1.0] - 2026-09-27
 
 ### Changed

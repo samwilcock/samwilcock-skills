@@ -34,7 +34,7 @@ Pick the mode at step 1 from the request plus a quick look at the repo layout â€
 
 2. **Plan and brief.**
    - *Light:* read `${CLAUDE_PLUGIN_ROOT}/agents/project-manager.md` for the plan and brief formats and the test-team findings check, explore the code you'll need to change, and write the plan and `context.md` yourself.
-   - *Full:* invoke `project-manager` with the summarized request and anything you already learned while scoping. It runs on Sonnet; pass `model: "opus"` only if the user asked for Opus planning. It returns the plan and writes `context.md`.
+   - *Full:* invoke `project-manager` with the summarized request and anything you already learned while scoping. It returns the plan and writes `context.md`.
    - For a large request, the plan splits into phases (see Phases). Ask the user about any open questions before continuing.
 
 3. **Approval gate.** Present the full plan: summary, scope, acceptance criteria, disciplines, mode, and phases if any. Don't implement anything until the user approves it. On requested changes, revise (full mode: send the feedback and the prior plan to `project-manager`) and present it again.

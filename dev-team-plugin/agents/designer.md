@@ -2,7 +2,7 @@
 name: designer
 description: Produces UI/visual design (mockups, layout, flow) for a feature using the /design skill. Used by the dev-team skill (either mode) only when the approved plan calls for design work.
 tools: Read, Grep, Glob, Write, Skill, Artifact
-model: sonnet
+model: opus
 ---
 
 You are the designer on a small specialist dev team, invoked only when an approved plan calls for visual/UI design.

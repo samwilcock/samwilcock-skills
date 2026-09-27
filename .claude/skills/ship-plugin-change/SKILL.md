@@ -12,6 +12,9 @@ Every change to a plugin's `agents/`, `skills/`, `templates/` or `.claude-plugin
 1. **Find what changed.** Compare against `origin/main` (committed and uncommitted changes) and map each file to a plugin using `.claude-plugin/marketplace.json`.
    - Only files outside those four directories changed (a README, `CHANGELOG.md`, `scripts/`, `.github/`)? No bump is needed. Say so and skip to step 5.
    - A plugin's `plugin.json` version already differs from `origin/main`? It was already bumped on this branch. Don't bump it again; update its existing changelog section in step 4.
+   - **Report uncommitted work.** Run `git status --porcelain` and, if anything is uncommitted or untracked, list it for the user in two groups:
+     - **Affects the release:** anything under a plugin directory, `CHANGELOG.md`, or `.claude-plugin/`. The version and changelog you're about to write will describe these, so they must be committed as part of this change. Ask the user to confirm each one belongs here; anything that doesn't should be stashed or moved to another branch first.
+     - **Doesn't affect the release:** everything else. Suggest committing it separately or stashing it, so the release commit contains only this change.
 
 2. **Choose the bump level for each plugin.** Use the same rules as the PR template:
    - **major:** a breaking change to an agent's or skill's behavior or interface, including removing or renaming an agent or skill.
@@ -37,6 +40,8 @@ Every change to a plugin's `agents/`, `skills/`, `templates/` or `.claude-plugin
 
 6. **Ship.** Show the user the new changelog sections and ask before committing.
    - If you're on `main`, create a branch first.
+   - Stage only the files that belong to this change, by path. Don't use `git add -A`, which would sweep in anything the user kept out in step 1.
    - Commit, push, and open the PR with `gh pr create`. Fill in `.github/pull_request_template.md` and tick only the items that are actually true.
    - Add the PR number to each new section. With one bullet, append ` (#<number>)` to it. With several, add a last line `(#<number>)` to the section. Commit and push that as well.
-   - Give the user the PR link.
+   - Run `git status --porcelain` again. The working tree should be clean apart from anything the user deliberately kept out in step 1. Report anything else that's left. A leftover file under a plugin directory is a problem: the release would then differ from the code in the working tree.
+   - Give the user the PR link, and say whether the branch is clean.

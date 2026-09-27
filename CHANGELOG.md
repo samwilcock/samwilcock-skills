@@ -2,6 +2,11 @@
 
 All notable changes to the plugins in this marketplace, newest first. Each heading is one plugin version, published as a GitHub release tagged `<plugin>-v<version>` (for example `dev-team-v2.1.0`). A change that touches both plugins has a heading for each.
 
+## [dev-team 2.2.1] - 2026-09-27
+
+### Changed
+- When a new test passes before any code is written, engineers and the light-mode session now confirm it can fail by briefly breaking the code it covers, then keep it as a guard for existing behavior. Engineers mark these tests in their reports.
+
 ## [dev-team 2.2.0] - 2026-09-27
 
 ### Added

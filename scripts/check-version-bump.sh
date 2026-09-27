@@ -2,7 +2,8 @@
 # For every plugin declared in .claude-plugin/marketplace.json, fails if that
 # plugin's agents/, skills/, viz/, templates/, or .claude-plugin/ changed
 # relative to $BASE_REF without a version bump in its plugin.json, or if the new version
-# isn't a valid single-step semver bump (major.minor.patch) over the old one.
+# isn't a valid single-step semver bump (major.minor.patch) over the old one,
+# or if the new version has no section in the repo's CHANGELOG.md.
 # Keeps installed copies of a plugin from silently going stale, and keeps
 # version numbers meaningful rather than arbitrary.
 #
@@ -19,6 +20,20 @@ if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
 fi
 
 fail=0
+
+# Fails the check unless CHANGELOG.md has a "## [<plugin> <version>]" section
+# for $dir's plugin, since that section becomes the version's release notes.
+require_changelog() {
+  local dir="$1" version="$2" name
+  name=$(jq -r .name "$dir/.claude-plugin/plugin.json")
+  if [ -z "$(./scripts/changelog-section.sh "$name" "$version")" ]; then
+    echo "FAIL: CHANGELOG.md has no \"## [$name $version]\" section — add one describing this release" >&2
+    fail=1
+  else
+    echo "ok: CHANGELOG.md has a section for $name $version"
+  fi
+}
+
 plugin_dirs=$(jq -r '.plugins[].source' .claude-plugin/marketplace.json | sed 's#^\./##')
 
 for dir in $plugin_dirs; do
@@ -42,6 +57,7 @@ for dir in $plugin_dirs; do
     new_version=$(jq -r .version "$dir/.claude-plugin/plugin.json")
     if [[ "$new_version" =~ $SEMVER_RE ]]; then
       echo "ok: $dir/.claude-plugin/plugin.json is new on this branch, starting at $new_version"
+      require_changelog "$dir" "$new_version"
     else
       echo "FAIL: $dir/.claude-plugin/plugin.json's version \"$new_version\" isn't valid major.minor.patch semver" >&2
       fail=1
@@ -93,6 +109,7 @@ for dir in $plugin_dirs; do
   fi
 
   echo "ok: $dir version bumped $old_version -> $new_version ($bump)"
+  require_changelog "$dir" "$new_version"
 done
 
 if [ "$fail" -ne 0 ]; then

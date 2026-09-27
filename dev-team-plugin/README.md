@@ -10,7 +10,7 @@ A Claude Code plugin that builds features with TDD. You approve a plan before an
 - **reviewer** — one independent pass per phase: runs the full suite, checks every criterion is tested, reviews the diff
 
 **Full** — for well-specified work that needs two or more of database/frontend/backend/devops with changes that are mostly in separate files. It adds:
-- **project-manager** (Sonnet; Opus if you ask) — plans the work and writes the context brief
+- **project-manager** (Opus) — plans the work and writes the context brief
 - **database-engineer** — schema and migrations, run before the other engineers
 - **frontend-engineer** / **backend-engineer** / **devops-engineer** — each writes its own failing tests, then the code, for one sub-feature at a time, running in parallel with each other
 

@@ -14,6 +14,8 @@ All notable changes to the plugins in this marketplace, newest first. Each headi
 - `reviewer` flags tests tied to the implementation, such as ones that mock the project's own code or call private functions, as problems to fix.
 - `project-manager` orders acceptance criteria with the most important behavior first.
 
+(#24)
+
 ## [test-team 2.0.0] - 2026-09-27
 
 test-team is now for testing existing code and hunting bugs in it. It no longer writes tests for features that haven't been built yet. dev-team now builds features one test at a time, so tests written ahead by a separate team would duplicate that work.
@@ -25,6 +27,8 @@ test-team is now for testing existing code and hunting bugs in it. It no longer 
 
 ### Removed
 - Writing tests for a feature that doesn't exist yet. `/test-team` now points you to `/dev-team`, which builds the feature test-first.
+
+(#24)
 
 ## [dev-team 2.1.0] - 2026-09-27
 

@@ -2,8 +2,8 @@
 # For every plugin declared in .claude-plugin/marketplace.json, publishes a
 # GitHub release for each version its plugin.json has ever had that isn't
 # tagged yet. The tag is "<plugin name>-v<version>" on the commit that first
-# set that version, and the release notes are that version's CHANGELOG.md
-# section. Fails if a version to release has no changelog section.
+# set that version, and the release notes are that version's section in
+# CHANGELOG.md. Fails if a version to release has no changelog section.
 #
 # Needs full git history and tags (fetch-depth: 0) and an authenticated gh.
 # Set DRY_RUN=1 to print what would be released without creating anything.
@@ -35,9 +35,9 @@ for dir in $plugin_dirs; do
       continue
     fi
 
-    notes=$(./scripts/changelog-section.sh "$dir" "$version")
+    notes=$(./scripts/changelog-section.sh "$name" "$version")
     if [ -z "$notes" ]; then
-      echo "FAIL: $tag has no \"## [$version]\" section in $dir/CHANGELOG.md" >&2
+      echo "FAIL: $tag has no \"## [$name $version]\" section in CHANGELOG.md" >&2
       fail=1
       continue
     fi

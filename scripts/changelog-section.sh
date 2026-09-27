@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
-# Prints the body of one version's section from a plugin's CHANGELOG.md: the
-# lines after its "## [<version>]" heading, up to the next "## [" heading, with
-# leading and trailing blank lines trimmed. Prints nothing if the file or the
-# section is missing. Used as release notes and by check-version-bump.sh.
+# Prints the body of one plugin version's section from the repo's CHANGELOG.md:
+# the lines after its "## [<plugin> <version>]" heading, up to the next "## ["
+# heading, with leading and trailing blank lines trimmed. Prints nothing if the
+# file or the section is missing. Used as release notes and by
+# check-version-bump.sh.
 #
-# Usage: ./scripts/changelog-section.sh <plugin-dir> <version>
+# Usage: ./scripts/changelog-section.sh <plugin-name> <version>
 set -euo pipefail
 
-dir="$1"
+cd "$(dirname "$0")/.."
+name="$1"
 version="$2"
-changelog="$dir/CHANGELOG.md"
+changelog="CHANGELOG.md"
 
 [ -f "$changelog" ] || exit 0
 
-awk -v heading="## [$version]" '
+awk -v heading="## [$name $version]" '
   index($0, heading) == 1 { found = 1; next }
   found && /^## \[/ { exit }
   found { lines[++n] = $0 }

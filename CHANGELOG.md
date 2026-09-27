@@ -1,13 +1,18 @@
 # Changelog
 
-All notable changes to the dev-team plugin. Each version is published as a GitHub release tagged `dev-team-v<version>`.
+All notable changes to the plugins in this marketplace, newest first. Each heading is one plugin version, published as a GitHub release tagged `<plugin>-v<version>` (for example `dev-team-v2.1.0`). A change that touches both plugins has a heading for each.
 
-## [2.1.0] - 2026-09-27
+## [dev-team 2.1.0] - 2026-09-27
 
 ### Changed
 - Every agent that ran on Sonnet now runs on Opus, using the `opus` alias so it follows the current Opus model. `researcher` stays on Haiku, and `project-manager` no longer needs an opt-in to plan on Opus. (#21)
 
-## [2.0.0] - 2026-09-16
+## [test-team 1.1.0] - 2026-09-27
+
+### Changed
+- Every agent now runs on Opus instead of Sonnet, using the `opus` alias so it follows the current Opus model. (#21)
+
+## [dev-team 2.0.0] - 2026-09-16
 
 This release cuts the cost of a run. A real run of 1.0.0 used a full 5-hour usage window in two hours, mostly because every specialist started cold and re-read the same code. (#20)
 
@@ -27,12 +32,22 @@ This release cuts the cost of a run. A real run of 1.0.0 used a full 5-hour usag
 - The live pipeline visualization.
 - The amendments log, replaced by the context brief.
 
-## [1.0.0] - 2026-09-16
+## [test-team 1.0.1] - 2026-09-16
+
+### Changed
+- Updated references to dev-team's `test-engineer` and `tester` agents, which dev-team 2.0.0 removed. (#20)
+
+## [dev-team 1.0.0] - 2026-09-16
 
 ### Changed
 - A paused run saved by an older version is re-planned instead of resumed as-is. Its saved request and plan go back to `project-manager`, you approve the new plan, and implementation restarts. Run-state files now record a schema version. (#19)
 
-## [0.10.0] - 2026-09-16
+## [test-team 1.0.0] - 2026-09-16
+
+### Changed
+- Version raised to 1.0.0 alongside dev-team 1.0.0. test-team itself did not change. (#19)
+
+## [dev-team 0.10.0] - 2026-09-16
 
 ### Added
 - `project-manager` checks `.claude/test-team-findings/` for open reports that relate to the request and adds them to the plan's acceptance criteria. A finding is marked fixed once its phase passes review.
@@ -51,7 +66,22 @@ This release cuts the cost of a run. A real run of 1.0.0 used a full 5-hour usag
 
 (#18)
 
-## [0.9.0] - 2026-09-16
+## [test-team 0.3.0] - 2026-09-16
+
+### Added
+- The unit, integration and e2e test engineers can split a broad target into batches.
+- The integration and e2e test engineers are warned that they share a test database and ports when they run in parallel.
+
+### Changed
+- A real bug found in existing behavior is marked skip or pending, with a link to its bug report, instead of being left failing in the project's test run.
+
+### Fixed
+- `test-plan-runner` found its template through a relative path that never resolved inside a target project. It now uses `${CLAUDE_PLUGIN_ROOT}`.
+- `bug-reporter` was missing the Edit tool it needs to update existing reports. It also now only ever sets a report's status to open.
+
+(#18)
+
+## [dev-team 0.9.0] - 2026-09-16
 
 ### Added
 - Large engineer workloads are split into batches of about 6–8 tests, with one engineer call per batch. `project-manager` flags requests that should be split into separate plan-and-build passes.
@@ -63,9 +93,19 @@ This release cuts the cost of a run. A real run of 1.0.0 used a full 5-hour usag
 
 (#17)
 
-## [0.8.4] - 2026-09-16
+## [test-team 0.2.0] - 2026-09-16
+
+### Added
+- A standard test plan template: target, preconditions, and numbered scenarios with steps, expected result and priority. `test-plan-runner` follows it when it writes a plan itself. (#16)
+
+## [dev-team 0.8.4] - 2026-09-16
 
 ### Changed
 - dev-team moved into the samwilcock-skills plugin marketplace. Install it with `/plugin install dev-team@samwilcock-skills`. (#15)
 
 Versions before 0.8.4 were released from the single-plugin repo layout. See the git history before #15.
+
+## [test-team 0.1.0] - 2026-09-16
+
+### Added
+- The first release: unit, integration and e2e test engineers, a test-plan runner, and a bug reporter, run through `/test-team`. Bug reports are written in a format dev-team's `project-manager` reads when planning fixes. (#15)

@@ -3,7 +3,7 @@
 # plugin's agents/, skills/, viz/, templates/, or .claude-plugin/ changed
 # relative to $BASE_REF without a version bump in its plugin.json, or if the new version
 # isn't a valid single-step semver bump (major.minor.patch) over the old one,
-# or if the new version has no section in the plugin's CHANGELOG.md.
+# or if the new version has no section in the repo's CHANGELOG.md.
 # Keeps installed copies of a plugin from silently going stale, and keeps
 # version numbers meaningful rather than arbitrary.
 #
@@ -21,15 +21,16 @@ fi
 
 fail=0
 
-# Fails the check unless $dir/CHANGELOG.md has a "## [<version>]" section,
-# since that section becomes the version's release notes.
+# Fails the check unless CHANGELOG.md has a "## [<plugin> <version>]" section
+# for $dir's plugin, since that section becomes the version's release notes.
 require_changelog() {
-  local dir="$1" version="$2"
-  if [ -z "$(./scripts/changelog-section.sh "$dir" "$version")" ]; then
-    echo "FAIL: $dir/CHANGELOG.md has no \"## [$version]\" section — add one describing this release" >&2
+  local dir="$1" version="$2" name
+  name=$(jq -r .name "$dir/.claude-plugin/plugin.json")
+  if [ -z "$(./scripts/changelog-section.sh "$name" "$version")" ]; then
+    echo "FAIL: CHANGELOG.md has no \"## [$name $version]\" section — add one describing this release" >&2
     fail=1
   else
-    echo "ok: $dir/CHANGELOG.md has a section for $version"
+    echo "ok: CHANGELOG.md has a section for $name $version"
   fi
 }
 

@@ -5,7 +5,7 @@ All notable changes to the plugins in this marketplace, newest first. Each headi
 ## [dev-team 2.2.1] - 2026-09-27
 
 ### Changed
-- When a new test passes before any code is written, engineers and the light-mode session now confirm it can fail by briefly breaking the code it covers, then keep it as a guard for existing behavior. Engineers mark these tests in their reports.
+- When a new test passes before any code is written, engineers and the light-mode session now confirm it can fail by briefly breaking the code it covers, then keep it as a guard for existing behavior. Engineers mark these tests in their reports. (#27)
 
 ## [dev-team 2.2.0] - 2026-09-27
 

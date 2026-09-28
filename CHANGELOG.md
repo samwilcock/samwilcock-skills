@@ -2,6 +2,22 @@
 
 All notable changes to the plugins in this marketplace, newest first. Each heading is one plugin version, published as a GitHub release tagged `<plugin>-v<version>` (for example `dev-team-v2.1.0`). A change that touches both plugins has a heading for each.
 
+## [dev-team 2.3.0] - 2026-09-28
+
+### Changed
+- The context brief and paused-run file now live in `~/.claude/dev-team/<project key>/` instead of the project's `.claude/dev-team/`, so they never show up in `git status` and projects no longer need a `.gitignore` entry for them. The key is the project root's path with non-alphanumeric characters replaced by `-`, so each project and git worktree gets its own. A run paused by an earlier 2.x version is moved there the next time you run `/dev-team`.
+- test-team bug reports are read from their new location outside the project, and any left in the project's `.claude/test-team-findings/` are moved there.
+
+(#29)
+
+## [test-team 2.1.0] - 2026-09-28
+
+### Changed
+- Bug reports are written to `~/.claude/test-team-findings/<project key>/` instead of the project's `.claude/test-team-findings/`, so they stay out of the project's git history and need no `.gitignore` entry. Reports from earlier versions are moved there the next time you run `/test-team` or `/dev-team`.
+- A test skipped because of a real bug now names the finding by its slug in its comment, rather than pointing at a findings path.
+
+(#29)
+
 ## [dev-team 2.2.1] - 2026-09-27
 
 ### Changed

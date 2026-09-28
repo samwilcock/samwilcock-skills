@@ -9,7 +9,21 @@ You run a feature request from discussion to tested, reviewed code using TDD. Mo
 
 ## Working files
 
-Both live in the target project under `.claude/dev-team/`. They're local working files — don't stage them in commits, and if the project's `.gitignore` doesn't cover `.claude/dev-team/`, mention that to the user once.
+Both live in the run directory, outside the project, under the user's global Claude config: `~/.claude/dev-team/<project key>/`. The key is the project root's absolute path with every character outside `A-Za-z0-9` replaced by `-`, so each project (and each git worktree) gets its own. Work out the absolute path once, at step 0, and use it from then on:
+
+```
+root=$(git rev-parse --show-toplevel 2>/dev/null || pwd); echo "$HOME/.claude/dev-team/$(printf %s "$root" | sed 's/[^A-Za-z0-9]/-/g')"
+```
+
+Nothing is written inside the project, so the files never show up in `git status` and the project's `.gitignore` doesn't need to cover them. Always pass agents the brief's absolute path, never `~`.
+
+Test-team bug reports use the same key under a different root, `~/.claude/test-team-findings/<project key>/`:
+
+```
+root=$(git rev-parse --show-toplevel 2>/dev/null || pwd); echo "$HOME/.claude/test-team-findings/$(printf %s "$root" | sed 's/[^A-Za-z0-9]/-/g')"
+```
+
+If `<project root>/.claude/test-team-findings/` exists, it holds reports from earlier test-team versions: move each file into the findings directory (leave any whose name is already taken there, and mention it), delete the old directory if it's now empty, and tell the user in one line.
 
 - **`context.md` — the context brief.** Written by whoever plans (you in light mode, `project-manager` in full mode), in the format described in `${CLAUDE_PLUGIN_ROOT}/agents/project-manager.md`. It's the shared map of the relevant code: files and their roles, conventions, the test command, key contracts, gotchas, and a "Decisions & deviations" section. Every agent reads it first and only explores beyond it for what it doesn't cover. After planning, **you are its only writer**: when a report mentions a deviation, an assumption, or something important the agent had to discover, append one line to it. That keeps later batches, the reviewer, the next phase, and a resumed session working from what's actually true.
 - **`run.md` — the run file.** Holds what's needed to pick up a paused run (see Stopping and resuming). It's written only when the run stops, not after every step.
@@ -28,13 +42,13 @@ Pick the mode at step 1 from the request plus a quick look at the repo layout �
 
 ## Pipeline
 
-0. **Check for a run to pick up** (see Stopping and resuming) before anything else.
+0. **Work out the run and findings directories** (see Working files) and **check for a run to pick up** (see Stopping and resuming) before anything else.
 
 1. **Scope.** Summarize the request, choose the mode, and record the phase's starting commit (`git rev-parse HEAD`, if `git rev-parse --is-inside-work-tree` succeeds). If the project isn't a git repo, note that the reviewer will have to review the working tree without a baseline.
 
 2. **Plan and brief.**
    - *Light:* read `${CLAUDE_PLUGIN_ROOT}/agents/project-manager.md` for the plan and brief formats and the test-team findings check, explore the code you'll need to change, and write the plan and `context.md` yourself.
-   - *Full:* invoke `project-manager` with the summarized request and anything you already learned while scoping. It returns the plan and writes `context.md`.
+   - *Full:* invoke `project-manager` with the summarized request, anything you already learned while scoping, the brief's absolute path, and the findings directory's absolute path. It returns the plan and writes `context.md` there.
    - For a large request, the plan splits into phases (see Phases). Ask the user about any open questions before continuing.
 
 3. **Approval gate.** Present the full plan: summary, scope, acceptance criteria, interface changes, disciplines, mode, and phases if any. Don't implement anything until the user approves it. On requested changes, revise (full mode: send the feedback and the prior plan to `project-manager`) and present it again.
@@ -54,7 +68,7 @@ Pick the mode at step 1 from the request plus a quick look at the repo layout �
 7. **Close out the phase.**
    - For each test-team finding the plan said this phase closes, change that file's frontmatter `status: open` to `status: fixed`.
    - **More phases left:** go straight to planning the next phase (step 2) without asking whether to continue. Record its starting commit, and pass the earlier phases' one-line summaries plus the brief. If the reviewer flagged a correctness or risk problem it didn't block on, check with the user first, since later phases build on this one.
-   - **Last phase:** the run is finished. Give the final summary and delete `run.md` and `context.md`.
+   - **Last phase:** the run is finished. Give the final summary and delete the run directory.
 
 ## Full-mode implementation
 
@@ -109,7 +123,8 @@ Approved: yes | no
 ```
 
 **On `/dev-team` (step 0):**
-- **`run.md` exists:** tell the user what was found (request, phase N of M, step) and ask whether to resume it or discard it — never silently pick. Resume means read `run.md` and `context.md` and continue from "Next step" (an approved plan isn't re-approved). Discard means delete both files and start fresh.
+- **Run from 2.x versions that stored it in the project:** if `<project root>/.claude/dev-team/` exists, move its `run.md` and `context.md` into the run directory (unless the run directory already has a `run.md`, in which case leave the old files and mention them), then delete `.claude/dev-team/` if it's now empty. Tell the user in one line that the run's files moved out of the project, and that any `.claude/dev-team/` entry in its `.gitignore` is no longer needed. Then carry on as below.
+- **`run.md` exists:** tell the user what was found (request, phase N of M, step) and ask whether to resume it or discard it — never silently pick. Resume means read `run.md` and `context.md` and continue from "Next step" (an approved plan isn't re-approved). Discard means delete the run directory and start fresh.
 - **Legacy run, from plugin versions before 2.0.0:** the file is `~/.claude/dev-team-runs/<slug>.json`, where the slug is the project directory's basename lowercased, with characters outside `a-z0-9-` replaced by `-` and repeats collapsed. Don't try to resume it — its pipeline no longer exists. Tell the user in one line that you're re-planning it for the current version. Take its `feature` and `plan` as the request and run steps 1–3 normally, framed as "same scope, re-planned", not as new scope. Then move the old file into `~/.claude/dev-team-runs/.archive/`. If both a legacy file and `run.md` exist, `run.md` wins; mention the legacy file.
 - **Neither:** start at step 1.
 

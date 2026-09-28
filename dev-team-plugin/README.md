@@ -32,16 +32,16 @@ Tests check behavior through public interfaces: exported functions, API endpoint
 
 ## How cost is kept down
 
-- **Context brief** — `.claude/dev-team/context.md` maps the relevant files, conventions, the test command, and key contracts. Every agent reads it instead of re-exploring the codebase. Deviations and discoveries get appended as work goes on, so it doesn't go stale.
+- **Context brief** — `context.md` maps the relevant files, conventions, the test command, and key contracts. Every agent reads it instead of re-exploring the codebase. Deviations and discoveries get appended as work goes on, so it doesn't go stale.
 - **Fewer handoffs** — engineers write their own tests, and a single reviewer does both verification and review.
 - **Batches are sub-features** — engineers run one coherent sub-feature per call, not arbitrary small chunks.
 - **Phases for large requests** — each phase ships an increment and is a natural point to pause and `/compact`.
 
 ## Pausing and resuming
 
-When a run stops before finishing — waiting on your approval, you ask to pause, or before a suggested `/compact` — it saves `.claude/dev-team/run.md` in the project. Run `/dev-team` again later and it offers to pick the run up where it stopped. The file is only written when the run stops, so if a session dies mid-step it resumes from the last stop. Finished runs clean up after themselves.
+When a run stops before finishing — waiting on your approval, you ask to pause, or before a suggested `/compact` — it saves `run.md` alongside the context brief. Run `/dev-team` again later and it offers to pick the run up where it stopped. The file is only written when the run stops, so if a session dies mid-step it resumes from the last stop. Finished runs clean up after themselves.
 
-Add `.claude/dev-team/` to your project's `.gitignore`; these are local working files.
+Both files live outside your project, in `~/.claude/dev-team/<project key>/`, where the key is the project root's path with non-alphanumeric characters replaced by `-`. Nothing is written into the repo, so there's nothing to add to `.gitignore`. Runs paused by 2.x versions, which saved them in the project's `.claude/dev-team/`, are moved there automatically the next time you run `/dev-team`; you can then drop `.claude/dev-team/` from your `.gitignore`.
 
 Paused runs from versions before 2.0.0 (saved under `~/.claude/dev-team-runs/`) can't be resumed as-is. `/dev-team` re-plans them from their saved request and plan, then archives the old file.
 

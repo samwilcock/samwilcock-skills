@@ -8,11 +8,15 @@ All notable changes to the plugins in this marketplace, newest first. Each headi
 - Engineers and the light-mode session now run only the test they're working on at each red and green step, and only their batch's tests after refactoring, instead of the whole suite every time. The context brief records a command for running a single test alongside the full-suite command.
 - `reviewer` runs the full suite once, on the run's last phase. On earlier phases it runs only the tests that phase added or changed. A run that isn't split into phases still gets one full-suite run at the end.
 
+(#30)
+
 ## [test-team 2.2.0] - 2026-09-29
 
 ### Changed
 - The unit, integration and e2e test engineers run only the tests they wrote, never the project's full suite.
 - The `test-team` skill runs the full suite once, after every engineer has reported, to check the new tests don't break it. Any test that does goes back to the engineer who wrote it.
+
+(#30)
 
 ## [dev-team 2.3.0] - 2026-09-28
 

@@ -36,7 +36,7 @@ Write it to the path you're given (create the directory if needed). It lives out
 - `path/to/file` — what it does and why it matters here
 
 ## Conventions
-- Test framework and the exact command to run the relevant tests
+- Test framework, the exact command to run a single test (one file or one test by name), and the command for the full suite
 - Patterns to follow (component structure, error handling, naming, etc.)
 
 ## Key contracts

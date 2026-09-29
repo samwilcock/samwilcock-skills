@@ -7,7 +7,7 @@ A Claude Code plugin that builds features with TDD. You approve a plan before an
 **Light (default)** — the current session plans, writes a short context brief, and implements with TDD itself. Subagents are used only where they add something:
 - **researcher** (Haiku) — cheap codebase lookups and external research
 - **designer** — UI design via the `/design` skill, when the plan needs it
-- **reviewer** — one independent pass per phase: runs the full suite, checks every criterion is tested, reviews the diff
+- **reviewer** — one independent pass per phase: runs the phase's tests (the full suite once, on the last phase), checks every criterion is tested, reviews the diff
 
 **Full** — for well-specified work that needs two or more of database/frontend/backend/devops with changes that are mostly in separate files. It adds:
 - **project-manager** (Opus) — plans the work and writes the context brief

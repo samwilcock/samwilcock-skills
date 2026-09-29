@@ -17,7 +17,7 @@ The team:
 4. **test-plan-runner** — executes a manual/scripted test plan and records pass/fail per scenario
 5. **bug-reporter** — turns every real failure surfaced above into a structured bug report file
 
-Test engineers run in parallel where more than one level applies; `bug-reporter` runs last, batching every real finding into one pass so it can deduplicate.
+Test engineers run in parallel where more than one level applies, each running only the tests it wrote. Once they've all reported, the project's full suite runs once to check the new tests don't break it. `bug-reporter` runs last, batching every real finding into one pass so it can deduplicate.
 
 ## Test plan template
 
